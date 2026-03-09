@@ -620,7 +620,7 @@ const TestPage = ({ student, test, onFinish }) => {
   const handleFinishClick=()=>{
     const answered=Object.keys(answersRef.current).length;
     const left=test.qCount-answered;
-    setConfirmMsg(left>0?`⚠️ ${left} ta savol javobsiz qoldi!\n\nTestni tugatmoqchimisiz?`:"Barcha savollarga javob berdiniz.\nTestni tugatmoqchimisiz?");
+    setConfirmMsg(left>0?`⚠️ ${left} ta savol javobsiz qoldi!\n\nTestni tugatmoqchimisiz?`:"Barcha savollarga javob berdingiz.\nTestni tugatmoqchimisiz?");
     setShowConfirm(true);
   };
 
