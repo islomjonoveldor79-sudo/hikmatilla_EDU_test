@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#0f172a"/>
+  <title>EduTest</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{-webkit-text-size-adjust:100%}
+    body{font-family:'Noto Sans',sans-serif;background:#0f172a;color:#e2e8f0;overflow-x:hidden}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#1e293b}
+    ::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+    input,textarea,select,button{font-family:'Noto Sans',sans-serif}
+    .fade-in{animation:fadeIn 0.3s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+    .modal-box{background:#1e293b;border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:32px;max-width:360px;width:100%;text-align:center;animation:fadeIn 0.2s ease}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ══ UTILS ══ */
+const TEACHER_CREDS = { username: "EduAdmin", password: "Teach@2025" };
+const fmt = s => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+const getGrade = (correct, total) => {
+  if (!total) return 1;
+  const p = (correct/total)*100;
+  if (p>=86) return 5; if (p>=71) return 4; if (p>=56) return 3; if (p>=41) return 2; return 1;
+};
+const gradeColor = g => ({5:"#22c55e",4:"#84cc16",3:"#eab308",2:"#f97316",1:"#ef4444"}[g]||"#94a3b8");
+const LETTERS = ["A","B","C","D"];
+const LC = { A:"#3b82f6", B:"#22c55e", C:"#f59e0b", D:"#ef4444" };
+
+/* ══ CONFIRM MODAL ══ */
+const ConfirmModal = ({ message, onConfirm, onCancel }) => (
+  <div className="modal-backdrop" onClick={onCancel}>
+    <div className="modal-box" onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:40,marginBottom:16}}>⚠️</div>
+      <p style={{color:"#f1f5f9",fontSize:15,lineHeight:1.6,marginBottom:24,whiteSpace:"pre-line"}}>{message}</p>
+      <div style={{display:"flex",gap:12,justifyContent:"center"}}>
+        <button onClick={onCancel} style={{padding:"10px 20px",borderRadius:10,border:"1px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.05)",color:"#94a3b8",fontWeight:600,cursor:"pointer",fontSize:14}}>Bekor qilish</button>
+        <button onClick={onConfirm} style={{padding:"10px 20px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",fontWeight:600,cursor:"pointer",fontSize:14,boxShadow:"0 4px 15px rgba(239,68,68,0.3)"}}>Ha, tugatish</button>
+      </div>
+    </div>
+  </div>
+);
+
+/* ══ UI PRIMITIVES ══ */
+const Btn = ({ children, onClick, variant="primary", size="md", disabled, style:sx={} }) => {
+  const base = { border:"none", borderRadius:"10px", fontWeight:600, cursor:disabled?"not-allowed":"pointer",
+    transition:"all 0.2s", opacity:disabled?0.5:1, touchAction:"manipulation",
+    padding:size==="sm"?"6px 14px":size==="lg"?"14px 28px":"10px 20px",
+    fontSize:size==="sm"?"13px":size==="lg"?"16px":"14px",
+    WebkitTapHighlightColor:"transparent", userSelect:"none" };
+  const v = {
+    primary:{background:"linear-gradient(135deg,#3b82f6,#2563eb)",color:"#fff",boxShadow:"0 4px 15px rgba(59,130,246,0.3)"},
+    success:{background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",boxShadow:"0 4px 15px rgba(34,197,94,0.3)"},
+    danger:{background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",boxShadow:"0 4px 15px rgba(239,68,68,0.3)"},
+    warning:{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff",boxShadow:"0 4px 15px rgba(245,158,11,0.3)"},
+    ghost:{background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"1px solid rgba(255,255,255,0.1)"},
+    outline:{background:"transparent",color:"#3b82f6",border:"1px solid #3b82f6"},
+  };
+  return <button style={{...base,...v[variant],...sx}} onClick={disabled?undefined:onClick}>{children}</button>;
+};
+
+const Input = ({ label, ...props }) => (
+  <div style={{marginBottom:16}}>
+    {label && <label style={{display:"block",fontSize:13,color:"#94a3b8",marginBottom:6,fontWeight:500}}>{label}</label>}
+    <input {...props} style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,0.05)",
+      border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#e2e8f0",fontSize:16,outline:"none",
+      WebkitAppearance:"none",...(props.style||{})}}
+      onFocus={e=>e.target.style.borderColor="#3b82f6"}
+      onBlur={e=>e.target.style.borderColor="rgba(255,255,255,0.1)"} />
+  </div>
+);
+
+const Card = ({ children, style:sx={}, className="" }) => (
+  <div className={className} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:20,...sx}}>
+    {children}
+  </div>
+);
+
+const Badge = ({ children, color="#3b82f6" }) => (
+  <span style={{background:color+"22",color,border:`1px solid ${color}44`,borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>
+    {children}
+  </span>
+);
+
+/* ══ ANSWER PICKER ══ */
+const AnswerPicker = ({ value, onChange, size="md" }) => {
+  const w = size==="lg" ? 56 : 42;
+  const fs = size==="lg" ? 17 : 14;
+  return (
+    <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+      {LETTERS.map(l => {
+        const sel = value===l;
+        return (
+          <button key={l} onClick={()=>onChange(l)}
+            style={{width:w,height:w,borderRadius:10,border:`2px solid ${sel?LC[l]:"rgba(255,255,255,0.1)"}`,
+              fontWeight:800,fontSize:fs,cursor:"pointer",transition:"all 0.15s",
+              background:sel?LC[l]:"rgba(255,255,255,0.06)",color:sel?"#fff":"#94a3b8",
+              boxShadow:sel?`0 4px 16px ${LC[l]}66`:"none",
+              transform:sel?"scale(1.12)":"scale(1)",
+              touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}}>
+            {l}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+/* ══ LANDING ══ */
+const LandingPage = ({ onTeacher, onStudent }) => (
+  <div className="fade-in" style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",
+    justifyContent:"center",padding:"24px 20px",
+    background:"radial-gradient(ellipse at 20% 50%,#1e3a5f22 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,#1e293b 0%,#0f172a 100%)"}}>
+    <div style={{textAlign:"center",marginBottom:40}}>
+      <div style={{width:76,height:76,borderRadius:22,margin:"0 auto 20px",
+        background:"linear-gradient(135deg,#3b82f6,#6366f1)",display:"flex",alignItems:"center",
+        justifyContent:"center",fontSize:36,boxShadow:"0 8px 32px rgba(99,102,241,0.4)"}}>🎓</div>
+      <h1 style={{fontSize:32,fontWeight:700,color:"#f1f5f9",letterSpacing:-0.5}}>EduTest</h1>
+      <p style={{color:"#64748b",marginTop:8,fontSize:14}}>O'qituvchi va o'quvchilar uchun test platformasi</p>
+    </div>
+    <div style={{display:"flex",gap:16,flexWrap:"wrap",justifyContent:"center",width:"100%",maxWidth:480}}>
+      {[
+        {icon:"👨‍🏫",title:"O'qituvchi",sub:"Test fayli va javoblar kiritish",cb:onTeacher,c:"59,130,246"},
+        {icon:"👨‍🎓",title:"O'quvchi",sub:"Test faylini yuklab javob berish",cb:onStudent,c:"34,197,94"}
+      ].map(b=>(
+        <div key={b.title} onClick={b.cb}
+          style={{flex:"1 1 180px",minWidth:160,maxWidth:220,padding:"28px 20px",textAlign:"center",cursor:"pointer",
+            background:`rgba(${b.c},0.08)`,border:`1px solid rgba(${b.c},0.2)`,borderRadius:20,transition:"all 0.2s",
+            WebkitTapHighlightColor:"transparent"}}
+          onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";e.currentTarget.style.boxShadow=`0 16px 40px rgba(${b.c},0.2)`}}
+          onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none"}}>
+          <div style={{fontSize:44,marginBottom:14}}>{b.icon}</div>
+          <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9"}}>{b.title}</div>
+          <div style={{fontSize:12,color:"#64748b",marginTop:6}}>{b.sub}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+/* ══ TEACHER LOGIN ══ */
+const TeacherLogin = ({ onLogin, onBack }) => {
+  const [form,setForm] = useState({username:"",password:""});
+  const [err,setErr] = useState("");
+  const go = () => form.username===TEACHER_CREDS.username && form.password===TEACHER_CREDS.password
+    ? onLogin() : setErr("Login yoki parol noto'g'ri!");
+  return (
+    <div className="fade-in" style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,
+      background:"radial-gradient(ellipse at center,#1e293b 0%,#0f172a 100%)"}}>
+      <Card style={{width:"100%",maxWidth:380,padding:32}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:"#64748b",fontSize:13,marginBottom:20,cursor:"pointer",padding:0}}>← Orqaga</button>
+        <div style={{fontSize:28,marginBottom:8}}>🔑</div>
+        <h2 style={{fontSize:20,fontWeight:700,color:"#f1f5f9",marginBottom:4}}>O'qituvchi kirishi</h2>
+        <p style={{color:"#64748b",fontSize:13,marginBottom:24}}>Tizimga kirish uchun ma'lumotlarni kiriting</p>
+        <Input label="Login" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="Login" autoCapitalize="none"/>
+        <Input label="Parol" type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="••••••••"
+          onKeyDown={e=>e.key==="Enter"&&go()}/>
+        {err && <p style={{color:"#ef4444",fontSize:13,marginBottom:12}}>⚠️ {err}</p>}
+        <Btn onClick={go} size="lg" style={{width:"100%",marginTop:8}}>Kirish</Btn>
+      </Card>
+    </div>
+  );
+};
+
+/* ══ TEACHER DASHBOARD ══ */
+const TeacherDashboard = ({ tests, setTests, students, setStudents, onLogout }) => {
+  const [tab,setTab] = useState("tests");
+  const [building,setBuilding] = useState(false);
+  const [title,setTitle] = useState("");
+  const [timeLimit,setTimeLimit] = useState(20);
+  const [qCount,setQCount] = useState(10);
+  const [answerKey,setAnswerKey] = useState({});
+  const [fileData,setFileData] = useState(null);
+  const fileRef = useRef();
+
+  const handleFile = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f);
+    setFileData({name:f.name,url,type:f.type});
+  };
+
+  const handleQCount = v => {
+    const n = Math.min(100,Math.max(1,v));
+    setQCount(n);
+    setAnswerKey(prev=>{const next={};for(let i=1;i<=n;i++)if(prev[i])next[i]=prev[i];return next;});
+  };
+
+  const saveTest = () => {
+    if (!title.trim()) return alert("Test nomini kiriting!");
+    if (!fileData) return alert("Test faylini yuklang!");
+    const missing=[];
+    for(let i=1;i<=qCount;i++)if(!answerKey[i])missing.push(i);
+    if(missing.length) return alert(`Javobsiz savollar: ${missing.slice(0,10).join(", ")}${missing.length>10?"...":""}`);
+    const t={id:Date.now(),title,timeLimit,qCount,answerKey:{...answerKey},fileData:{...fileData},active:false,createdAt:new Date().toLocaleString("uz-UZ")};
+    setTests(p=>[...p,t]);
+    resetBuilder(); setTab("manage");
+  };
+
+  const resetBuilder=()=>{setTitle("");setTimeLimit(20);setQCount(10);setAnswerKey({});setFileData(null);setBuilding(false)};
+  const toggleActive=id=>setTests(p=>p.map(t=>t.id===id?{...t,active:!t.active}:t));
+  const deleteTest=id=>{if(window.confirm("O'chirilsinmi?"))setTests(p=>p.filter(t=>t.id!==id))};
+  const adjustTime=(id,d)=>setTests(p=>p.map(t=>t.id===id?{...t,timeLimit:Math.min(120,Math.max(5,t.timeLimit+d))}:t));
+  const giveRetry=(sid,tid)=>setStudents(p=>p.map(s=>s.id===sid?{...s,attempts:s.attempts.map(a=>a.testId===tid?{...a,canRetry:true}:a)}:s));
+
+  const TabBtn=({id,label,icon})=>(
+    <button onClick={()=>setTab(id)} style={{padding:"9px 14px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,
+      transition:"all 0.2s",WebkitTapHighlightColor:"transparent",
+      background:tab===id?"rgba(59,130,246,0.2)":"transparent",color:tab===id?"#3b82f6":"#64748b"}}>{icon} {label}</button>
+  );
+
+  const AnswerKeyGrid = () => {
+    const filled=Object.keys(answerKey).length;
+    return (
+      <div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <p style={{color:"#94a3b8",fontSize:13,fontWeight:600}}>JAVOBLAR KALITI</p>
+          <span style={{color:filled===qCount?"#22c55e":"#f59e0b",fontSize:13,fontWeight:600}}>{filled}/{qCount} {filled===qCount?"✅":""}</span>
+        </div>
+        <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{color:"#64748b",fontSize:12}}>Hammasini:</span>
+          {LETTERS.map(l=>(
+            <button key={l} onClick={()=>{const k={};for(let i=1;i<=qCount;i++)k[i]=l;setAnswerKey(k);}}
+              style={{padding:"5px 12px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,
+                background:LC[l]+"22",color:LC[l],WebkitTapHighlightColor:"transparent"}}>{l}</button>
+          ))}
+          <button onClick={()=>setAnswerKey({})} style={{padding:"5px 12px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,background:"rgba(255,255,255,0.05)",color:"#64748b"}}>Tozalash</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:6}}>
+          {Array.from({length:qCount},(_,i)=>i+1).map(n=>{
+            const val=answerKey[n]; const vc=val?LC[val]:null;
+            return (
+              <div key={n} style={{background:val?vc+"11":"rgba(255,255,255,0.02)",borderRadius:10,padding:"8px 4px",
+                border:`1px solid ${val?vc+"33":"rgba(255,255,255,0.05)"}`,textAlign:"center",transition:"all 0.15s"}}>
+                <div style={{color:val?vc:"#475569",fontSize:11,marginBottom:5,fontWeight:700}}>#{n}</div>
+                <div style={{display:"flex",gap:2,justifyContent:"center"}}>
+                  {LETTERS.map(l=>{
+                    const sel=val===l; const c=LC[l];
+                    return (
+                      <button key={l} onClick={()=>setAnswerKey(prev=>({...prev,[n]:l}))}
+                        style={{width:22,height:22,borderRadius:5,border:sel?`1px solid ${c}`:"none",
+                          fontWeight:800,fontSize:10,cursor:"pointer",transition:"all 0.1s",
+                          background:sel?c:"rgba(255,255,255,0.06)",color:sel?"#fff":"#475569",
+                          transform:sel?"scale(1.1)":"scale(1)",WebkitTapHighlightColor:"transparent"}}>{l}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:"#0f172a"}}>
+      <div style={{background:"rgba(255,255,255,0.03)",borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"0 16px",
+        display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:50}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:22}}>🎓</span>
+          <span style={{fontWeight:700,fontSize:16,color:"#f1f5f9"}}>EduTest</span>
+          <Badge color="#3b82f6">O'qituvchi</Badge>
+        </div>
+        <div style={{display:"flex",gap:4,alignItems:"center"}}>
+          <TabBtn id="tests" label="Testlar" icon="📝"/>
+          <TabBtn id="manage" label="Boshqarish" icon="⚙️"/>
+          <TabBtn id="results" label="Natijalar" icon="📊"/>
+          <Btn onClick={onLogout} variant="ghost" size="sm">↩</Btn>
+        </div>
+      </div>
+
+      <div style={{maxWidth:900,margin:"0 auto",padding:"20px 16px 40px"}}>
+
+        {tab==="tests" && (
+          <div className="fade-in">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+              <h2 style={{fontSize:20,fontWeight:700,color:"#f1f5f9"}}>Testlar</h2>
+              {!building && <Btn onClick={()=>setBuilding(true)} variant="success">+ Yangi test</Btn>}
+            </div>
+
+            {building && (
+              <Card style={{marginBottom:20}}>
+                <h3 style={{color:"#f1f5f9",marginBottom:20,fontWeight:700,fontSize:17}}>📋 Yangi test yaratish</h3>
+                <Input label="Test nomi" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Masalan: Matematika variant-1"/>
+                <div style={{display:"flex",gap:16,marginBottom:16,flexWrap:"wrap"}}>
+                  <div style={{flex:"1 1 120px"}}>
+                    <label style={{display:"block",fontSize:13,color:"#94a3b8",marginBottom:6,fontWeight:500}}>Vaqt (daqiqa)</label>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <Btn onClick={()=>setTimeLimit(t=>Math.max(5,t-5))} variant="ghost" size="sm">−5</Btn>
+                      <span style={{color:"#f1f5f9",fontWeight:700,minWidth:32,textAlign:"center"}}>{timeLimit}</span>
+                      <Btn onClick={()=>setTimeLimit(t=>Math.min(120,t+5))} variant="ghost" size="sm">+5</Btn>
+                    </div>
+                  </div>
+                  <div style={{flex:"1 1 120px"}}>
+                    <label style={{display:"block",fontSize:13,color:"#94a3b8",marginBottom:6,fontWeight:500}}>Savollar soni</label>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <Btn onClick={()=>handleQCount(qCount-1)} variant="ghost" size="sm">−</Btn>
+                      <span style={{color:"#f1f5f9",fontWeight:700,minWidth:32,textAlign:"center"}}>{qCount}</span>
+                      <Btn onClick={()=>handleQCount(qCount+1)} variant="ghost" size="sm">+</Btn>
+                    </div>
+                  </div>
+                </div>
+                <div style={{marginBottom:20}}>
+                  <label style={{display:"block",fontSize:13,color:"#94a3b8",marginBottom:8,fontWeight:500}}>Test fayli (rasm, PDF yoki Word)</label>
+                  <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                    <Btn onClick={()=>fileRef.current.click()} variant="outline" size="sm">📎 Fayl tanlash</Btn>
+                    <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" style={{display:"none"}} onChange={handleFile}/>
+                    {fileData && (
+                      <div style={{display:"flex",alignItems:"center",gap:8,background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"8px 12px"}}>
+                        <span style={{fontSize:16}}>{fileData.type.startsWith("image")?"🖼️":"📄"}</span>
+                        <span style={{color:"#22c55e",fontSize:13,fontWeight:600,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fileData.name}</span>
+                        <button onClick={()=>setFileData(null)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:18,lineHeight:1,padding:0}}>×</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{background:"rgba(0,0,0,0.2)",borderRadius:14,padding:16,marginBottom:20,border:"1px solid rgba(255,255,255,0.06)"}}>
+                  <AnswerKeyGrid/>
+                </div>
+                <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                  <Btn onClick={saveTest} variant="success">💾 Saqlash</Btn>
+                  <Btn onClick={resetBuilder} variant="ghost">Bekor qilish</Btn>
+                </div>
+              </Card>
+            )}
+
+            {tests.length===0 && !building && (
+              <Card style={{textAlign:"center",padding:48}}>
+                <div style={{fontSize:44,marginBottom:16}}>📋</div>
+                <p style={{color:"#64748b"}}>Hali test yaratilmagan.</p>
+              </Card>
+            )}
+
+            {tests.map(t=>(
+              <Card key={t.id} style={{marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <span style={{fontSize:26}}>{t.fileData?.type?.startsWith("image")?"🖼️":"📄"}</span>
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                        <span style={{color:"#f1f5f9",fontWeight:600}}>{t.title}</span>
+                        <Badge color={t.active?"#22c55e":"#64748b"}>{t.active?"Faol":"Nofaol"}</Badge>
+                      </div>
+                      <span style={{color:"#64748b",fontSize:12}}>{t.qCount} ta savol · ⏱ {t.timeLimit} min</span>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <Btn onClick={()=>toggleActive(t.id)} variant={t.active?"warning":"success"} size="sm">{t.active?"⏸ To'xtatish":"▶ Faollashtirish"}</Btn>
+                    <Btn onClick={()=>deleteTest(t.id)} variant="danger" size="sm">🗑</Btn>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {tab==="manage" && (
+          <div className="fade-in">
+            <h2 style={{fontSize:20,fontWeight:700,color:"#f1f5f9",marginBottom:20}}>Test boshqarish</h2>
+            {tests.length===0 && <Card style={{textAlign:"center",padding:48}}><p style={{color:"#64748b"}}>Avval test yarating</p></Card>}
+            {tests.map(test=>{
+              const ts=students.filter(s=>s.attempts.some(a=>a.testId===test.id));
+              return (
+                <Card key={test.id} style={{marginBottom:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:10}}>
+                    <div>
+                      <h3 style={{color:"#f1f5f9",fontWeight:700}}>{test.title}</h3>
+                      <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
+                        <Badge color={test.active?"#22c55e":"#64748b"}>{test.active?"Faol":"Nofaol"}</Badge>
+                        <span style={{color:"#64748b",fontSize:12}}>{test.qCount} savol</span>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <Btn onClick={()=>adjustTime(test.id,-5)} variant="ghost" size="sm">−5</Btn>
+                      <span style={{color:"#f1f5f9",fontWeight:700,minWidth:44,textAlign:"center"}}>{test.timeLimit} min</span>
+                      <Btn onClick={()=>adjustTime(test.id,5)} variant="ghost" size="sm">+5</Btn>
+                    </div>
+                  </div>
+                  {ts.length===0
+                    ? <p style={{color:"#64748b",fontSize:13}}>Hali hech qaysi o'quvchi topshirmagan</p>
+                    : ts.map(s=>{
+                        const att=s.attempts.filter(a=>a.testId===test.id);
+                        const fin=att.filter(a=>a.finished).length;
+                        const last=att[att.length-1];
+                        const canGive=last&&!last.canRetry&&fin>=1&&fin<2;
+                        return (
+                          <div key={s.id} style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"12px 14px",marginBottom:6,
+                            display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                            <div>
+                              <span style={{color:"#f1f5f9",fontWeight:600}}>{s.name} {s.surname}</span>
+                              <span style={{color:"#64748b",fontSize:13,marginLeft:8}}>{s.group}</span>
+                            </div>
+                            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                              <Badge color="#64748b">{fin}/2 urinish</Badge>
+                              {canGive && <Btn onClick={()=>giveRetry(s.id,test.id)} variant="warning" size="sm">🔓 2-imkoniyat</Btn>}
+                              {fin>=2 && <Badge color="#ef4444">Tugagan</Badge>}
+                            </div>
+                          </div>
+                        );
+                    })}
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {tab==="results" && (
+          <div className="fade-in">
+            <h2 style={{fontSize:20,fontWeight:700,color:"#f1f5f9",marginBottom:20}}>Barcha natijalar</h2>
+            {tests.map(test=>{
+              const rows=students.flatMap(s=>s.attempts.filter(a=>a.testId===test.id&&a.finished).map(a=>({s,a})));
+              if(!rows.length) return null;
+              return (
+                <Card key={test.id} style={{marginBottom:20}}>
+                  <h3 style={{color:"#f1f5f9",fontWeight:700,marginBottom:4}}>{test.title}</h3>
+                  <p style={{color:"#64748b",fontSize:13,marginBottom:16}}>{rows.length} ta o'quvchi</p>
+                  <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",minWidth:480}}>
+                      <thead>
+                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
+                          {["#","Ism","Guruh","To'g'ri","Foiz","Baho","Vaqt"].map(h=>(
+                            <th key={h} style={{padding:"10px 12px",color:"#64748b",fontSize:12,fontWeight:600,textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.sort((x,y)=>y.a.score-x.a.score).map(({s,a},i)=>{
+                          const g=getGrade(a.score,test.qCount);
+                          const pct=Math.round((a.score/test.qCount)*100);
+                          return (
+                            <tr key={`${s.id}-${a.startTime}`} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                              <td style={{padding:"11px 12px",color:"#64748b",fontSize:13}}>{i+1}</td>
+                              <td style={{padding:"11px 12px",color:"#f1f5f9",fontWeight:600,fontSize:13,whiteSpace:"nowrap"}}>{s.name} {s.surname}</td>
+                              <td style={{padding:"11px 12px",fontSize:13}}><Badge color="#6366f1">{s.group}</Badge></td>
+                              <td style={{padding:"11px 12px",color:"#22c55e",fontWeight:700}}>{a.score}/{test.qCount}</td>
+                              <td style={{padding:"11px 12px",color:"#3b82f6",fontWeight:600}}>{pct}%</td>
+                              <td style={{padding:"11px 12px"}}>
+                                <span style={{background:gradeColor(g)+"22",color:gradeColor(g),border:`1px solid ${gradeColor(g)}44`,borderRadius:8,padding:"3px 10px",fontWeight:800,fontSize:15}}>{g}</span>
+                              </td>
+                              <td style={{padding:"11px 12px",color:"#94a3b8",fontSize:13}}>{fmt(a.timeTaken)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              );
+            })}
+            {tests.every(t=>!students.some(s=>s.attempts.some(a=>a.testId===t.id&&a.finished))) && (
+              <Card style={{textAlign:"center",padding:48}}>
+                <div style={{fontSize:44,marginBottom:16}}>📊</div>
+                <p style={{color:"#64748b"}}>Hali natijalar yo'q</p>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ══ STUDENT ENTRY ══ */
+const StudentEntry = ({ tests, students, setStudents, onStart, onBack }) => {
+  const [form,setForm] = useState({name:"",surname:"",group:""});
+  const [selId,setSelId] = useState("");
+  const [err,setErr] = useState("");
+  const active = tests.filter(t=>t.active);
+
+  const go = () => {
+    setErr("");
+    if(!form.name.trim()||!form.surname.trim()||!form.group.trim()) return setErr("Barcha maydonlarni to'ldiring!");
+    if(!selId) return setErr("Test tanlang!");
+    const test=tests.find(t=>t.id===Number(selId));
+    if(!test) return setErr("Test topilmadi!");
+    let student=students.find(s=>s.name===form.name&&s.surname===form.surname&&s.group===form.group);
+    if(!student){student={id:Date.now(),...form,attempts:[]};setStudents(p=>[...p,student]);}
+    const done=student.attempts.filter(a=>a.testId===test.id&&a.finished);
+    if(done.length>=2) return setErr("Siz bu testni 2 marta ishladingiz. O'qituvchidan ruxsat oling.");
+    if(done.length===1){
+      const last=student.attempts.filter(a=>a.testId===test.id).slice(-1)[0];
+      if(!last?.canRetry) return setErr("Ikkinchi urinish uchun o'qituvchidan ruxsat oling!");
+    }
+    onStart({student,test});
+  };
+
+  return (
+    <div className="fade-in" style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,
+      background:"radial-gradient(ellipse at center,#1e293b 0%,#0f172a 100%)"}}>
+      <Card style={{width:"100%",maxWidth:420,padding:28}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:"#64748b",fontSize:13,marginBottom:20,cursor:"pointer",padding:0}}>← Orqaga</button>
+        <div style={{fontSize:28,marginBottom:8}}>👨‍🎓</div>
+        <h2 style={{fontSize:20,fontWeight:700,color:"#f1f5f9",marginBottom:4}}>O'quvchi kirishi</h2>
+        <p style={{color:"#64748b",fontSize:13,marginBottom:22}}>Ma'lumotlaringizni to'ldiring</p>
+        <Input label="Ism" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Jasur"/>
+        <Input label="Familiya" value={form.surname} onChange={e=>setForm({...form,surname:e.target.value})} placeholder="Karimov"/>
+        <Input label="Guruh" value={form.group} onChange={e=>setForm({...form,group:e.target.value})} placeholder="IT-21"/>
+        <div style={{marginBottom:16}}>
+          <label style={{display:"block",fontSize:13,color:"#94a3b8",marginBottom:6,fontWeight:500}}>Test tanlang</label>
+          <select value={selId} onChange={e=>setSelId(e.target.value)}
+            style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",
+              borderRadius:10,color:"#e2e8f0",fontSize:16,outline:"none",WebkitAppearance:"none",appearance:"none"}}>
+            <option value="">-- Test tanlang --</option>
+            {active.map(t=><option key={t.id} value={t.id} style={{background:"#1e293b"}}>{t.title} ({t.qCount} savol, {t.timeLimit} min)</option>)}
+          </select>
+          {active.length===0 && <p style={{color:"#f59e0b",fontSize:12,marginTop:6}}>⚠️ Hozircha faol test yo'q</p>}
+        </div>
+        {err && <p style={{color:"#ef4444",fontSize:13,marginBottom:12}}>⚠️ {err}</p>}
+        <Btn onClick={go} size="lg" variant="success" style={{width:"100%",marginTop:4}}>Testni boshlash ▶</Btn>
+      </Card>
+    </div>
+  );
+};
+
+/* ══ TEST PAGE ══ */
+const TestPage = ({ student, test, onFinish }) => {
+  const [answers,setAnswers] = useState({});
+  const [currentQ,setCurrentQ] = useState(1);
+  const [timeLeft,setTimeLeft] = useState(test.timeLimit*60);
+  const [showConfirm,setShowConfirm] = useState(false);
+  const [confirmMsg,setConfirmMsg] = useState("");
+  const answersRef=useRef({});
+  const finishedRef=useRef(false);
+  const startRef=useRef(Date.now());
+  const timerRef=useRef(null);
+
+  const pick=(qNum,letter)=>{
+    const next={...answersRef.current,[qNum]:letter};
+    answersRef.current=next; setAnswers({...next});
+  };
+
+  const calcFinish=useCallback(()=>{
+    if(finishedRef.current)return;
+    finishedRef.current=true;
+    if(timerRef.current)clearInterval(timerRef.current);
+    const timeTaken=Math.floor((Date.now()-startRef.current)/1000);
+    const ans=answersRef.current;
+    let score=0;
+    for(let i=1;i<=test.qCount;i++)if(ans[i]&&test.answerKey[i]&&ans[i]===test.answerKey[i])score++;
+    onFinish({answers:{...ans},score,timeTaken,startTime:startRef.current,finished:true,
+      testId:test.id,finishedAt:new Date().toLocaleString("uz-UZ"),canRetry:false});
+  },[test,onFinish]);
+
+  useEffect(()=>{
+    timerRef.current=setInterval(()=>{
+      setTimeLeft(prev=>{
+        if(prev<=1){clearInterval(timerRef.current);setTimeout(calcFinish,100);return 0;}
+        return prev-1;
+      });
+    },1000);
+    return()=>clearInterval(timerRef.current);
+  },[calcFinish]);
+
+  const handleFinishClick=()=>{
+    const answered=Object.keys(answersRef.current).length;
+    const left=test.qCount-answered;
+    setConfirmMsg(left>0?`⚠️ ${left} ta savol javobsiz qoldi!\n\nTestni tugatmoqchimisiz?`:"Barcha savollarga javob berdiniz.\nTestni tugatmoqchimisiz?");
+    setShowConfirm(true);
+  };
+
+  const urgent=timeLeft<=60;
+  const pct=(timeLeft/(test.timeLimit*60))*100;
+  const answeredCount=Object.keys(answers).length;
+
+  return (
+    <div style={{minHeight:"100vh",background:"#0f172a",display:"flex",flexDirection:"column"}}>
+      {showConfirm && <ConfirmModal message={confirmMsg} onConfirm={()=>{setShowConfirm(false);calcFinish();}} onCancel={()=>setShowConfirm(false)}/>}
+
+      <div style={{background:"rgba(15,23,42,0.97)",backdropFilter:"blur(12px)",borderBottom:"1px solid rgba(255,255,255,0.08)",
+        padding:"0 12px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,position:"sticky",top:0,zIndex:100,gap:8}}>
+        <div style={{minWidth:0}}>
+          <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{test.title}</div>
+          <div style={{color:"#64748b",fontSize:11}}>{student.name} · {student.group}</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",
+            background:urgent?"rgba(239,68,68,0.12)":"rgba(59,130,246,0.1)",
+            border:`1px solid ${urgent?"rgba(239,68,68,0.35)":"rgba(59,130,246,0.3)"}`,
+            borderRadius:10,animation:urgent?"pulse 1s infinite":"none"}}>
+            <span style={{fontSize:13}}>⏱</span>
+            <span style={{fontSize:18,fontWeight:800,color:urgent?"#ef4444":"#3b82f6",fontVariantNumeric:"tabular-nums",letterSpacing:1}}>{fmt(timeLeft)}</span>
+          </div>
+          <Btn onClick={handleFinishClick} variant="danger" size="sm">Tugatish</Btn>
+        </div>
+      </div>
+
+      <div style={{height:3,background:"rgba(255,255,255,0.05)"}}>
+        <div style={{height:"100%",background:urgent?"#ef4444":"linear-gradient(90deg,#3b82f6,#6366f1)",width:`${pct}%`,transition:"width 1s linear"}}/>
+      </div>
+
+      {test.fileData && (
+        <div style={{background:"rgba(255,255,255,0.03)",borderBottom:"1px solid rgba(255,255,255,0.07)",
+          padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:18}}>{test.fileData.type?.startsWith("image")?"🖼️":"📄"}</span>
+            <span style={{color:"#94a3b8",fontSize:13,fontWeight:500,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{test.fileData.name}</span>
+          </div>
+          <a href={test.fileData.url} download={test.fileData.name}
+            style={{display:"inline-flex",alignItems:"center",gap:6,
+              background:"linear-gradient(135deg,#3b82f6,#2563eb)",color:"#fff",
+              padding:"8px 16px",borderRadius:10,fontWeight:600,fontSize:13,textDecoration:"none",
+              boxShadow:"0 4px 12px rgba(59,130,246,0.35)",whiteSpace:"nowrap"}}>
+            ⬇️ Test faylini yuklab olish
+          </a>
+        </div>
+      )}
+
+      <div style={{flex:1,overflowY:"auto",padding:"16px 12px 32px",WebkitOverflowScrolling:"touch"}}>
+        <div style={{maxWidth:680,margin:"0 auto"}}>
+          <div style={{display:"flex",gap:10,marginBottom:16,justifyContent:"center"}}>
+            {[
+              {v:answeredCount,c:"#22c55e",bg:"rgba(34,197,94,0.1)",bc:"rgba(34,197,94,0.2)",l:"Javob berildi"},
+              {v:test.qCount-answeredCount,c:"#ef4444",bg:"rgba(239,68,68,0.08)",bc:"rgba(239,68,68,0.15)",l:"Qoldi"},
+              {v:test.qCount,c:"#3b82f6",bg:"rgba(59,130,246,0.1)",bc:"rgba(59,130,246,0.2)",l:"Jami"}
+            ].map(s=>(
+              <div key={s.l} style={{flex:1,background:s.bg,border:`1px solid ${s.bc}`,borderRadius:10,padding:"8px 4px",textAlign:"center"}}>
+                <div style={{color:s.c,fontWeight:800,fontSize:20}}>{s.v}</div>
+                <div style={{color:"#64748b",fontSize:11}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+
+          <Card style={{padding:14,marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <p style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>SAVOLLAR</p>
+              <span style={{fontSize:12,color:answeredCount===test.qCount?"#22c55e":"#f59e0b",fontWeight:600}}>
+                {answeredCount}/{test.qCount} {answeredCount===test.qCount?"✅":""}
+              </span>
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+              {Array.from({length:test.qCount},(_,i)=>i+1).map(n=>{
+                const ans=answers[n]; const cur=n===currentQ;
+                const ac=ans?LC[ans]:"#64748b";
+                return (
+                  <button key={n} onClick={()=>setCurrentQ(n)}
+                    style={{width:32,height:32,borderRadius:7,border:cur?"2px solid #3b82f6":"1px solid rgba(255,255,255,0.1)",
+                      cursor:"pointer",fontWeight:700,fontSize:11,transition:"all 0.12s",
+                      background:cur?"#3b82f6":ans?LC[ans]+"22":"rgba(255,255,255,0.04)",
+                      color:cur?"#fff":ans?ac:"#64748b",WebkitTapHighlightColor:"transparent"}}>
+                    {ans||n}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card style={{padding:20,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
+              <div style={{width:42,height:42,borderRadius:12,background:"linear-gradient(135deg,#3b82f6,#6366f1)",
+                display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:17,flexShrink:0}}>
+                {currentQ}
+              </div>
+              <div>
+                <p style={{color:"#f1f5f9",fontWeight:700,fontSize:16}}>{currentQ}-savol javobi</p>
+                <p style={{color:"#64748b",fontSize:12}}>To'g'ri javob harfini tanlang</p>
+              </div>
+            </div>
+            <AnswerPicker size="lg" value={answers[currentQ]||null} onChange={l=>pick(currentQ,l)}/>
+            {answers[currentQ] && (
+              <div style={{marginTop:14,padding:"10px 14px",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.15)",borderRadius:10}}>
+                <span style={{color:"#22c55e",fontSize:14,fontWeight:600}}>✓ {currentQ}-savol: <strong>{answers[currentQ]}</strong></span>
+              </div>
+            )}
+          </Card>
+
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+            <Btn onClick={()=>setCurrentQ(n=>Math.max(1,n-1))} variant="ghost" disabled={currentQ===1} size="sm">← Oldingi</Btn>
+            <span style={{color:"#64748b",fontSize:13}}>{currentQ} / {test.qCount}</span>
+            {currentQ<test.qCount
+              ? <Btn onClick={()=>setCurrentQ(n=>n+1)} variant="primary" size="sm">Keyingi →</Btn>
+              : <Btn onClick={handleFinishClick} variant="success" size="sm">✅ Tugatish</Btn>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ══ STUDENT RESULT ══ */
+const StudentResult = ({ student, test, attempt, onBack }) => {
+  const grade=getGrade(attempt.score,test.qCount);
+  const pct=test.qCount?Math.round((attempt.score/test.qCount)*100):0;
+  const [showDetail,setShowDetail]=useState(false);
+
+  return (
+    <div className="fade-in" style={{minHeight:"100vh",background:"#0f172a",padding:"20px 16px 40px",overflowY:"auto"}}>
+      <div style={{maxWidth:640,margin:"0 auto"}}>
+        <Card style={{textAlign:"center",padding:"32px 20px",marginBottom:16}}>
+          <div style={{fontSize:56,marginBottom:14}}>{grade>=4?"🎉":grade===3?"👍":"📚"}</div>
+          <h2 style={{fontSize:24,fontWeight:800,color:"#f1f5f9",marginBottom:6}}>Test yakunlandi!</h2>
+          <p style={{color:"#64748b",fontSize:14,marginBottom:28}}>{student.name} {student.surname} · {student.group}</p>
+          <div style={{width:110,height:110,borderRadius:"50%",margin:"0 auto 24px",
+            background:`conic-gradient(${gradeColor(grade)} ${pct}%, rgba(255,255,255,0.05) ${pct}%)`,
+            display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 36px ${gradeColor(grade)}44`}}>
+            <div style={{width:88,height:88,borderRadius:"50%",background:"#0f172a",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontSize:30,fontWeight:900,color:gradeColor(grade)}}>{grade}</span>
+              <span style={{fontSize:10,color:"#64748b"}}>BAHO</span>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:22}}>
+            {[
+              {l:"To'g'ri",v:attempt.score,c:"#22c55e",i:"✅"},
+              {l:"Noto'g'ri",v:test.qCount-attempt.score,c:"#ef4444",i:"❌"},
+              {l:"Foiz",v:`${pct}%`,c:"#3b82f6",i:"📊"},
+              {l:"Vaqt",v:fmt(attempt.timeTaken),c:"#f59e0b",i:"⏱"}
+            ].map(s=>(
+              <div key={s.l} style={{background:"rgba(255,255,255,0.04)",borderRadius:12,padding:"14px 8px"}}>
+                <div style={{fontSize:22,marginBottom:4}}>{s.i}</div>
+                <div style={{fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
+                <div style={{fontSize:12,color:"#64748b"}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <Btn onClick={()=>setShowDetail(v=>!v)} variant="outline" size="sm">
+            {showDetail?"▲ Yashirish":"▼ Savol-javob tahlili"}
+          </Btn>
+        </Card>
+
+        {showDetail && (
+          <Card className="fade-in" style={{marginBottom:16}}>
+            <h3 style={{color:"#f1f5f9",fontWeight:700,marginBottom:14}}>Javoblar tahlili</h3>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
+              {Array.from({length:test.qCount},(_,i)=>i+1).map(n=>{
+                const mine=attempt.answers[n]; const correct=test.answerKey[n];
+                const isOk=mine&&mine===correct; const noAns=!mine;
+                return (
+                  <div key={n} style={{background:isOk?"rgba(34,197,94,0.07)":noAns?"rgba(245,158,11,0.07)":"rgba(239,68,68,0.07)",
+                    border:`1px solid ${isOk?"rgba(34,197,94,0.2)":noAns?"rgba(245,158,11,0.2)":"rgba(239,68,68,0.2)"}`,
+                    borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{color:"#64748b",fontWeight:700,fontSize:13,minWidth:24}}>{n}.</span>
+                    <div>
+                      <div style={{fontSize:11,color:"#64748b",marginBottom:1}}>Sizniki</div>
+                      <span style={{fontWeight:800,fontSize:15,color:isOk?"#22c55e":noAns?"#f59e0b":"#ef4444"}}>{mine||"—"}</span>
+                    </div>
+                    {!isOk&&!noAns&&(
+                      <>
+                        <span style={{color:"#475569",fontSize:12}}>→</span>
+                        <div>
+                          <div style={{fontSize:11,color:"#64748b",marginBottom:1}}>To'g'ri</div>
+                          <span style={{fontWeight:800,fontSize:15,color:"#22c55e"}}>{correct}</span>
+                        </div>
+                      </>
+                    )}
+                    {isOk&&<span style={{marginLeft:"auto",fontSize:16}}>✅</span>}
+                    {noAns&&<span style={{marginLeft:"auto",fontSize:16}}>⚪</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+        <div style={{textAlign:"center"}}>
+          <Btn onClick={onBack} variant="ghost" size="lg">← Bosh sahifaga</Btn>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ══ APP ROOT ══ */
+function App() {
+  const [view,setView]=useState("landing");
+  const [tests,setTests]=useState([]);
+  const [students,setStudents]=useState([]);
+  const [teacherLoggedIn,setTeacherLoggedIn]=useState(false);
+  const [session,setSession]=useState(null);
+  const [lastResult,setLastResult]=useState(null);
+
+  const handleTestFinish=useCallback((att)=>{
+    const {student,test}=session;
+    setStudents(prev=>prev.map(s=>{
+      if(s.id!==student.id)return s;
+      const idx=s.attempts.findIndex(a=>a.testId===test.id&&!a.finished);
+      if(idx>=0){const a=[...s.attempts];a[idx]={...a[idx],...att};return {...s,attempts:a};}
+      return{...s,attempts:[...s.attempts,att]};
+    }));
+    setLastResult({student:{...student},test:{...test},attempt:{...att}});
+    setView("result");
+  },[session]);
+
+  const handleStart=({student,test})=>{
+    const att={testId:test.id,answers:{},score:0,timeTaken:0,finished:false,startTime:Date.now(),finishedAt:null,canRetry:false};
+    setStudents(prev=>{
+      const idx=prev.findIndex(s=>s.id===student.id);
+      if(idx>=0){const u=[...prev];u[idx]={...u[idx],attempts:[...u[idx].attempts,att]};return u;}
+      return[...prev,{...student,attempts:[att]}];
+    });
+    setSession({student,test}); setView("test");
+  };
+
+  return (
+    <>
+      {view==="landing"&&<LandingPage onTeacher={()=>teacherLoggedIn?setView("teacher"):setView("teacher-login")} onStudent={()=>setView("student-entry")}/>}
+      {view==="teacher-login"&&<TeacherLogin onLogin={()=>{setTeacherLoggedIn(true);setView("teacher");}} onBack={()=>setView("landing")}/>}
+      {view==="teacher"&&<TeacherDashboard tests={tests} setTests={setTests} students={students} setStudents={setStudents} onLogout={()=>{setTeacherLoggedIn(false);setView("landing");}}/>}
+      {view==="student-entry"&&<StudentEntry tests={tests} students={students} setStudents={setStudents} onStart={handleStart} onBack={()=>setView("landing")}/>}
+      {view==="test"&&session&&<TestPage student={session.student} test={session.test} onFinish={handleTestFinish}/>}
+      {view==="result"&&lastResult&&<StudentResult student={lastResult.student} test={lastResult.test} attempt={lastResult.attempt} onBack={()=>setView("landing")}/>}
+    </>
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
+</script>
+</body>
+</html>
