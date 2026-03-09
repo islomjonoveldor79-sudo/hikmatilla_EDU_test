@@ -216,12 +216,6 @@ const TeacherDashboard = ({ tests, setTests, students, setStudents, onLogout }) 
   const adjustTime=(id,d)=>setTests(p=>p.map(t=>t.id===id?{...t,timeLimit:Math.min(120,Math.max(5,t.timeLimit+d))}:t));
   const giveRetry=(sid,tid)=>setStudents(p=>p.map(s=>s.id===sid?{...s,attempts:s.attempts.map(a=>a.testId===tid?{...a,canRetry:true}:a)}:s));
 
-  const TabBtn=({id,label,icon})=>(
-    <button onClick={()=>setTab(id)} style={{padding:"9px 14px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,
-      transition:"all 0.2s",WebkitTapHighlightColor:"transparent",
-      background:tab===id?"rgba(59,130,246,0.2)":"transparent",color:tab===id?"#3b82f6":"#64748b"}}>{icon} {label}</button>
-  );
-
   const AnswerKeyGrid = () => {
     const filled=Object.keys(answerKey).length;
     return (
@@ -266,24 +260,54 @@ const TeacherDashboard = ({ tests, setTests, students, setStudents, onLogout }) 
     );
   };
 
+  const TABS = [
+    {id:"tests",  label:"Testlar",    icon:"📝"},
+    {id:"manage", label:"Boshqarish", icon:"⚙️"},
+    {id:"results",label:"Natijalar",  icon:"📊"},
+  ];
+
   return (
-    <div style={{minHeight:"100vh",background:"#0f172a"}}>
-      <div style={{background:"rgba(255,255,255,0.03)",borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"0 16px",
-        display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:50}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:22}}>🎓</span>
-          <span style={{fontWeight:700,fontSize:16,color:"#f1f5f9"}}>EduTest</span>
+    <div style={{minHeight:"100vh",background:"#0f172a",paddingBottom:72}}>
+      {/* Top bar: faqat logo + chiqish */}
+      <div style={{background:"rgba(255,255,255,0.03)",borderBottom:"1px solid rgba(255,255,255,0.07)",
+        padding:"0 14px",display:"flex",alignItems:"center",justifyContent:"space-between",
+        height:52,position:"sticky",top:0,zIndex:50}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:20}}>🎓</span>
+          <span style={{fontWeight:700,fontSize:15,color:"#f1f5f9"}}>EduTest</span>
           <Badge color="#3b82f6">O'qituvchi</Badge>
         </div>
-        <div style={{display:"flex",gap:4,alignItems:"center"}}>
-          <TabBtn id="tests" label="Testlar" icon="📝"/>
-          <TabBtn id="manage" label="Boshqarish" icon="⚙️"/>
-          <TabBtn id="results" label="Natijalar" icon="📊"/>
-          <Btn onClick={onLogout} variant="ghost" size="sm">↩</Btn>
-        </div>
+        <button onClick={onLogout}
+          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:10,
+            border:"1px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.05)",
+            color:"#94a3b8",fontWeight:600,fontSize:13,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+          ↩ Chiqish
+        </button>
       </div>
 
-      <div style={{maxWidth:900,margin:"0 auto",padding:"20px 16px 40px"}}>
+      {/* Bottom tab bar */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,
+        background:"rgba(13,20,38,0.98)",backdropFilter:"blur(16px)",
+        borderTop:"1px solid rgba(255,255,255,0.1)",
+        display:"flex",height:62,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+        {TABS.map(t=>{
+          const act = tab===t.id;
+          return (
+            <button key={t.id} onClick={()=>setTab(t.id)}
+              style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",
+                justifyContent:"center",gap:3,border:"none",cursor:"pointer",
+                background:"transparent",WebkitTapHighlightColor:"transparent",
+                color:act?"#3b82f6":"#64748b",position:"relative",transition:"color 0.2s"}}>
+              {act && <div style={{position:"absolute",top:0,left:"20%",right:"20%",
+                height:2,background:"#3b82f6",borderRadius:"0 0 3px 3px"}}/>}
+              <span style={{fontSize:22,lineHeight:1}}>{t.icon}</span>
+              <span style={{fontSize:11,fontWeight:act?700:400,letterSpacing:0.2}}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{maxWidth:900,margin:"0 auto",padding:"16px 14px 20px"}}>
 
         {tab==="tests" && (
           <div className="fade-in">
@@ -296,21 +320,29 @@ const TeacherDashboard = ({ tests, setTests, students, setStudents, onLogout }) 
               <Card style={{marginBottom:20}}>
                 <h3 style={{color:"#f1f5f9",marginBottom:20,fontWeight:700,fontSize:17}}>📋 Yangi test yaratish</h3>
                 <Input label="Test nomi" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Masalan: Matematika variant-1"/>
-                <div style={{display:"flex",gap:16,marginBottom:16,flexWrap:"wrap"}}>
-                  <div style={{flex:"1 1 120px"}}>
-                    <label style={{display:"block",fontSize:13,color:"#94a3b8",marginBottom:6,fontWeight:500}}>Vaqt (daqiqa)</label>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <Btn onClick={()=>setTimeLimit(t=>Math.max(5,t-5))} variant="ghost" size="sm">−5</Btn>
-                      <span style={{color:"#f1f5f9",fontWeight:700,minWidth:32,textAlign:"center"}}>{timeLimit}</span>
-                      <Btn onClick={()=>setTimeLimit(t=>Math.min(120,t+5))} variant="ghost" size="sm">+5</Btn>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+                  <div style={{background:"rgba(255,255,255,0.03)",borderRadius:12,padding:"12px"}}>
+                    <label style={{display:"block",fontSize:12,color:"#94a3b8",marginBottom:8,fontWeight:500}}>⏱ Vaqt (daqiqa)</label>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <button onClick={()=>setTimeLimit(t=>Math.max(5,t-5))}
+                        style={{width:34,height:34,borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",
+                          background:"rgba(255,255,255,0.05)",color:"#94a3b8",fontWeight:700,cursor:"pointer",fontSize:16,flexShrink:0}}>−</button>
+                      <span style={{color:"#f1f5f9",fontWeight:700,flex:1,textAlign:"center",fontSize:16}}>{timeLimit}</span>
+                      <button onClick={()=>setTimeLimit(t=>Math.min(120,t+5))}
+                        style={{width:34,height:34,borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",
+                          background:"rgba(255,255,255,0.05)",color:"#94a3b8",fontWeight:700,cursor:"pointer",fontSize:16,flexShrink:0}}>+</button>
                     </div>
                   </div>
-                  <div style={{flex:"1 1 120px"}}>
-                    <label style={{display:"block",fontSize:13,color:"#94a3b8",marginBottom:6,fontWeight:500}}>Savollar soni</label>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <Btn onClick={()=>handleQCount(qCount-1)} variant="ghost" size="sm">−</Btn>
-                      <span style={{color:"#f1f5f9",fontWeight:700,minWidth:32,textAlign:"center"}}>{qCount}</span>
-                      <Btn onClick={()=>handleQCount(qCount+1)} variant="ghost" size="sm">+</Btn>
+                  <div style={{background:"rgba(255,255,255,0.03)",borderRadius:12,padding:"12px"}}>
+                    <label style={{display:"block",fontSize:12,color:"#94a3b8",marginBottom:8,fontWeight:500}}>📋 Savollar soni</label>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <button onClick={()=>handleQCount(qCount-1)}
+                        style={{width:34,height:34,borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",
+                          background:"rgba(255,255,255,0.05)",color:"#94a3b8",fontWeight:700,cursor:"pointer",fontSize:16,flexShrink:0}}>−</button>
+                      <span style={{color:"#f1f5f9",fontWeight:700,flex:1,textAlign:"center",fontSize:16}}>{qCount}</span>
+                      <button onClick={()=>handleQCount(qCount+1)}
+                        style={{width:34,height:34,borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",
+                          background:"rgba(255,255,255,0.05)",color:"#94a3b8",fontWeight:700,cursor:"pointer",fontSize:16,flexShrink:0}}>+</button>
                     </div>
                   </div>
                 </div>
@@ -347,20 +379,31 @@ const TeacherDashboard = ({ tests, setTests, students, setStudents, onLogout }) 
 
             {tests.map(t=>(
               <Card key={t.id} style={{marginBottom:10}}>
-                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
-                    <span style={{fontSize:26}}>{t.fileData?.type?.startsWith("image")?"🖼️":"📄"}</span>
-                    <div>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
-                        <span style={{color:"#f1f5f9",fontWeight:600}}>{t.title}</span>
+                    <span style={{fontSize:26,flexShrink:0}}>{t.fileData?.type?.startsWith("image")?"🖼️":"📄"}</span>
+                    <div style={{minWidth:0,flex:1}}>
+                      <div style={{color:"#f1f5f9",fontWeight:600,fontSize:14,marginBottom:4,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                         <Badge color={t.active?"#22c55e":"#64748b"}>{t.active?"Faol":"Nofaol"}</Badge>
+                        <span style={{color:"#64748b",fontSize:12}}>{t.qCount} savol · {t.timeLimit} min</span>
                       </div>
-                      <span style={{color:"#64748b",fontSize:12}}>{t.qCount} ta savol · ⏱ {t.timeLimit} min</span>
                     </div>
                   </div>
                   <div style={{display:"flex",gap:8}}>
-                    <Btn onClick={()=>toggleActive(t.id)} variant={t.active?"warning":"success"} size="sm">{t.active?"⏸ To'xtatish":"▶ Faollashtirish"}</Btn>
-                    <Btn onClick={()=>deleteTest(t.id)} variant="danger" size="sm">🗑</Btn>
+                    <button onClick={()=>toggleActive(t.id)}
+                      style={{flex:1,padding:"9px 8px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,
+                        background:t.active?"linear-gradient(135deg,#f59e0b,#d97706)":"linear-gradient(135deg,#22c55e,#16a34a)",
+                        color:"#fff",WebkitTapHighlightColor:"transparent"}}>
+                      {t.active?"⏸ To'xtatish":"▶ Faollashtirish"}
+                    </button>
+                    <button onClick={()=>deleteTest(t.id)}
+                      style={{padding:"9px 14px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,
+                        background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",
+                        WebkitTapHighlightColor:"transparent"}}>
+                      🗑
+                    </button>
                   </div>
                 </div>
               </Card>
@@ -376,18 +419,27 @@ const TeacherDashboard = ({ tests, setTests, students, setStudents, onLogout }) 
               const ts=students.filter(s=>s.attempts.some(a=>a.testId===test.id));
               return (
                 <Card key={test.id} style={{marginBottom:16}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:10}}>
-                    <div>
-                      <h3 style={{color:"#f1f5f9",fontWeight:700}}>{test.title}</h3>
-                      <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
-                        <Badge color={test.active?"#22c55e":"#64748b"}>{test.active?"Faol":"Nofaol"}</Badge>
-                        <span style={{color:"#64748b",fontSize:12}}>{test.qCount} savol</span>
+                  <div style={{marginBottom:14}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap",marginBottom:10}}>
+                      <div style={{minWidth:0,flex:1}}>
+                        <h3 style={{color:"#f1f5f9",fontWeight:700,fontSize:15,
+                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{test.title}</h3>
+                        <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
+                          <Badge color={test.active?"#22c55e":"#64748b"}>{test.active?"Faol":"Nofaol"}</Badge>
+                          <span style={{color:"#64748b",fontSize:12}}>{test.qCount} savol</span>
+                        </div>
                       </div>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <Btn onClick={()=>adjustTime(test.id,-5)} variant="ghost" size="sm">−5</Btn>
-                      <span style={{color:"#f1f5f9",fontWeight:700,minWidth:44,textAlign:"center"}}>{test.timeLimit} min</span>
-                      <Btn onClick={()=>adjustTime(test.id,5)} variant="ghost" size="sm">+5</Btn>
+                    <div style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.03)",
+                      borderRadius:10,padding:"10px 12px"}}>
+                      <span style={{color:"#94a3b8",fontSize:13,marginRight:4}}>⏱ Vaqt:</span>
+                      <button onClick={()=>adjustTime(test.id,-5)}
+                        style={{padding:"6px 12px",borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",
+                          background:"rgba(255,255,255,0.05)",color:"#94a3b8",fontWeight:700,cursor:"pointer",fontSize:14}}>−5</button>
+                      <span style={{color:"#f1f5f9",fontWeight:700,minWidth:52,textAlign:"center",fontSize:15}}>{test.timeLimit} min</span>
+                      <button onClick={()=>adjustTime(test.id,5)}
+                        style={{padding:"6px 12px",borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",
+                          background:"rgba(255,255,255,0.05)",color:"#94a3b8",fontWeight:700,cursor:"pointer",fontSize:14}}>+5</button>
                     </div>
                   </div>
                   {ts.length===0
