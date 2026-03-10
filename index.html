@@ -177,7 +177,7 @@ const TeacherLogin = ({ onLogin, onBack }) => {
 };
 
 /* ══ TEACHER DASHBOARD ══ */
-const TeacherDashboard = ({ tests, setTests, students, setStudents, onLogout }) => {
+const TeacherDashboard = ({ tests, setTests, students, setStudents, onSaveTest, onLogout }) => {
   const [tab,setTab] = useState("tests");
   const [building,setBuilding] = useState(false);
   const [title,setTitle] = useState("");
@@ -189,8 +189,12 @@ const TeacherDashboard = ({ tests, setTests, students, setStudents, onLogout }) 
 
   const handleFile = e => {
     const f = e.target.files[0]; if (!f) return;
-    const url = URL.createObjectURL(f);
-    setFileData({name:f.name,url,type:f.type});
+    // base64 ga o'giramiz — localStorage da saqlanadi
+    const reader = new FileReader();
+    reader.onload = ev => {
+      setFileData({name:f.name, type:f.type, url:ev.target.result});
+    };
+    reader.readAsDataURL(f);
   };
 
   const handleQCount = v => {
@@ -206,7 +210,7 @@ const TeacherDashboard = ({ tests, setTests, students, setStudents, onLogout }) 
     for(let i=1;i<=qCount;i++)if(!answerKey[i])missing.push(i);
     if(missing.length) return alert(`Javobsiz savollar: ${missing.slice(0,10).join(", ")}${missing.length>10?"...":""}`);
     const t={id:Date.now(),title,timeLimit,qCount,answerKey:{...answerKey},fileData:{...fileData},active:false,createdAt:new Date().toLocaleString("uz-UZ")};
-    setTests(p=>[...p,t]);
+    onSaveTest(t);  // N8N + localStorage ga saqlaydi
     resetBuilder(); setTab("manage");
   };
 
@@ -824,26 +828,131 @@ const StudentResult = ({ student, test, attempt, onBack }) => {
   );
 };
 
+/* ══ localStorage helpers ══ */
+const LS = {
+  get:(key,def)=>{try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch{return def;}},
+  set:(key,val)=>{try{localStorage.setItem(key,JSON.stringify(val));}catch(e){
+    console.warn("localStorage limit:",e);
+    alert("⚠️ Xotira to'ldi! Eski testlarni o'chiring.");
+  }},
+};
+
+/* ══════════════════════════════════════════════════════
+   N8N WEBHOOK URL — SHU YERGA O'Z URL INGIZNI QO'YING!
+   N8N → Webhook node → Production URL ni nusxalang
+   Ko'rinishi: https://xxxx.app.n8n.cloud/webhook/xxxx
+══════════════════════════════════════════════════════ */
+const WEBHOOK_URL = "https://umid.app.n8n.cloud/webhook/b0a43c42-133c-4c84-96a7-af2a2d71c657";
+
+/* ══ N8N ga ma'lumot yuborish ══
+   type: "save_test"     → test saqlanganda
+   type: "save_result"   → o'quvchi topshirganda
+   type: "load_tests"    → sahifa ochilganda testlarni olish
+   type: "load_results"  → o'qituvchi natijalarni ko'rganda
+══════════════════════════════ */
+const n8n = async (type, data={}) => {
+  if (!WEBHOOK_URL || WEBHOOK_URL.includes("SHU_YERGA")) {
+    // N8N ulanmagan — faqat localStorage dan ishlaydi
+    return null;
+  }
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, ...data }),
+    });
+    if (!res.ok) throw new Error("N8N javob bermadi");
+    return await res.json();
+  } catch(e) {
+    console.warn("N8N xato (localStorage dan ishlaydi):", e);
+    return null;
+  }
+};
+
 /* ══ APP ROOT ══ */
 function App() {
-  const [view,setView]=useState("landing");
-  const [tests,setTests]=useState([]);
-  const [students,setStudents]=useState([]);
-  const [teacherLoggedIn,setTeacherLoggedIn]=useState(false);
-  const [session,setSession]=useState(null);
-  const [lastResult,setLastResult]=useState(null);
+  const [view,setView]       = useState("landing");
+  const [teacherLoggedIn,setTeacherLoggedIn] = useState(()=>LS.get("edutest_logged",false));
+  const [session,setSession] = useState(null);
+  const [lastResult,setLastResult] = useState(null);
+  const [syncing,setSyncing] = useState(false);
 
-  const handleTestFinish=useCallback((att)=>{
+  // localStorage dan yuklash
+  const [tests,setTestsRaw]       = useState(()=>LS.get("edutest_tests",[]));
+  const [students,setStudentsRaw] = useState(()=>LS.get("edutest_students",[]));
+
+  // Saqlovchi wrapper — localStorage + N8N ga yuboradi
+  const setTests = useCallback(fn=>{
+    setTestsRaw(prev=>{
+      const next = typeof fn==="function" ? fn(prev) : fn;
+      LS.set("edutest_tests", next);
+      return next;
+    });
+  },[]);
+
+  const setStudents = useCallback(fn=>{
+    setStudentsRaw(prev=>{
+      const next = typeof fn==="function" ? fn(prev) : fn;
+      LS.set("edutest_students", next);
+      return next;
+    });
+  },[]);
+
+  // Sahifa ochilganda N8N dan testlarni yuklash (agar N8N ulangan bo'lsa)
+  useEffect(()=>{
+    const loadFromN8N = async () => {
+      setSyncing(true);
+      // Testlarni yuklash
+      const testsRes = await n8n("load_tests");
+      if (testsRes && Array.isArray(testsRes.tests) && testsRes.tests.length > 0) {
+        setTestsRaw(testsRes.tests);
+        LS.set("edutest_tests", testsRes.tests);
+      }
+      // Natijalarni yuklash
+      const studentsRes = await n8n("load_results");
+      if (studentsRes && Array.isArray(studentsRes.students) && studentsRes.students.length > 0) {
+        setStudentsRaw(studentsRes.students);
+        LS.set("edutest_students", studentsRes.students);
+      }
+      setSyncing(false);
+    };
+    loadFromN8N();
+  },[]);
+
+  const handleTestFinish=useCallback(async (att)=>{
     const {student,test}=session;
-    setStudents(prev=>prev.map(s=>{
-      if(s.id!==student.id)return s;
-      const idx=s.attempts.findIndex(a=>a.testId===test.id&&!a.finished);
-      if(idx>=0){const a=[...s.attempts];a[idx]={...a[idx],...att};return {...s,attempts:a};}
-      return{...s,attempts:[...s.attempts,att]};
-    }));
+    let updatedStudents;
+    setStudents(prev=>{
+      updatedStudents = prev.map(s=>{
+        if(s.id!==student.id)return s;
+        const idx=s.attempts.findIndex(a=>a.testId===test.id&&!a.finished);
+        if(idx>=0){const a=[...s.attempts];a[idx]={...a[idx],...att};return{...s,attempts:a};}
+        return{...s,attempts:[...s.attempts,att]};
+      });
+      return updatedStudents;
+    });
+
+    // N8N ga natijani yuborish — Google Sheets ga yoziladi
+    const grade = att.score && test.qCount ?
+      (att.score/test.qCount*100>=86?5:att.score/test.qCount*100>=71?4:att.score/test.qCount*100>=56?3:att.score/test.qCount*100>=41?2:1) : 1;
+    await n8n("save_result", {
+      studentId:  student.id,
+      ism:        student.name,
+      familiya:   student.surname,
+      guruh:      student.group,
+      testNomi:   test.title,
+      testId:     test.id,
+      ball:       att.score,
+      jami:       test.qCount,
+      foiz:       Math.round((att.score/test.qCount)*100),
+      baho:       grade,
+      vaqt:       `${Math.floor(att.timeTaken/60)}:${String(att.timeTaken%60).padStart(2,"0")}`,
+      sana:       att.finishedAt,
+    });
+
     setLastResult({student:{...student},test:{...test},attempt:{...att}});
     setView("result");
-  },[session]);
+  },[session,setStudents]);
 
   const handleStart=({student,test})=>{
     const att={testId:test.id,answers:{},score:0,timeTaken:0,finished:false,startTime:Date.now(),finishedAt:null,canRetry:false};
@@ -855,11 +964,53 @@ function App() {
     setSession({student,test}); setView("test");
   };
 
+  const handleLogin=()=>{
+    setTeacherLoggedIn(true);
+    LS.set("edutest_logged",true);
+    setView("teacher");
+  };
+  const handleLogout=()=>{
+    setTeacherLoggedIn(false);
+    LS.set("edutest_logged",false);
+    setView("landing");
+  };
+
+  // Test saqlanganida N8N ga yuborish (TeacherDashboard ichida setTests chaqirilganda)
+  // Bu funksiya TeacherDashboard ga beriladi
+  const handleSaveTest = useCallback(async (newTest) => {
+    setTests(prev => {
+      const next = [...prev, newTest];
+      // Faylsiz versiyasini N8N ga yuboramiz (base64 katta bo'lishi mumkin)
+      const testForN8N = {...newTest, fileData: newTest.fileData
+        ? {name: newTest.fileData.name, type: newTest.fileData.type}
+        : null};
+      n8n("save_test", {
+        testId:    newTest.id,
+        nomi:      newTest.title,
+        savollar:  newTest.qCount,
+        vaqt:      newTest.timeLimit,
+        javoblar:  JSON.stringify(newTest.answerKey),
+        yaratilgan:newTest.createdAt,
+        aktiv:     newTest.active,
+        fayl:      testForN8N.fileData?.name || "",
+      });
+      return next;
+    });
+  },[setTests]);
+
   return (
     <>
+      {/* Sinxronlash ko'rsatkichi */}
+      {syncing && (
+        <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,height:3,
+          background:"linear-gradient(90deg,#3b82f6,#6366f1,#3b82f6)",
+          backgroundSize:"200% 100%",animation:"shimmer 1.5s infinite"}}>
+          <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+        </div>
+      )}
       {view==="landing"&&<LandingPage onTeacher={()=>teacherLoggedIn?setView("teacher"):setView("teacher-login")} onStudent={()=>setView("student-entry")}/>}
-      {view==="teacher-login"&&<TeacherLogin onLogin={()=>{setTeacherLoggedIn(true);setView("teacher");}} onBack={()=>setView("landing")}/>}
-      {view==="teacher"&&<TeacherDashboard tests={tests} setTests={setTests} students={students} setStudents={setStudents} onLogout={()=>{setTeacherLoggedIn(false);setView("landing");}}/>}
+      {view==="teacher-login"&&<TeacherLogin onLogin={handleLogin} onBack={()=>setView("landing")}/>}
+      {view==="teacher"&&<TeacherDashboard tests={tests} setTests={setTests} students={students} setStudents={setStudents} onSaveTest={handleSaveTest} onLogout={handleLogout}/>}
       {view==="student-entry"&&<StudentEntry tests={tests} students={students} setStudents={setStudents} onStart={handleStart} onBack={()=>setView("landing")}/>}
       {view==="test"&&session&&<TestPage student={session.student} test={session.test} onFinish={handleTestFinish}/>}
       {view==="result"&&lastResult&&<StudentResult student={lastResult.student} test={lastResult.test} attempt={lastResult.attempt} onBack={()=>setView("landing")}/>}
