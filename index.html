@@ -201,9 +201,20 @@ const TeacherDashboard = ({ tests, setTests, students, setStudents, onSaveTest, 
     resetBuilder(); setTab("manage");
   };
 
+  const [deleteConfirm,setDeleteConfirm] = useState(null); // {id} yoki null
+
   const resetBuilder=()=>{setTitle("");setTimeLimit(20);setQCount(10);setAnswerKey({});setBuilding(false)};
-  const toggleActive=id=>setTests(p=>p.map(t=>t.id===id?{...t,active:!t.active}:t));
-  const deleteTest=id=>{if(window.confirm("O'chirilsinmi?"))setTests(p=>p.filter(t=>t.id!==id))};
+  const toggleActive=id=>{
+    setTests(p=>p.map(t=>{
+      if(t.id!==id) return t;
+      const newActive=!t.active;
+      // N8N/Sheets ga aktiv holatini yangilash
+      n8n("UPDATE_TEST_STATUS",{testId:t.id,aktiv:String(newActive)}).catch(()=>{});
+      return {...t,active:newActive};
+    }));
+  };
+  const deleteTest=id=>setDeleteConfirm({id});
+  const confirmDelete=()=>{if(deleteConfirm)setTests(p=>p.filter(t=>t.id!==deleteConfirm.id));setDeleteConfirm(null);};
   const adjustTime=(id,d)=>setTests(p=>p.map(t=>t.id===id?{...t,timeLimit:Math.min(120,Math.max(5,t.timeLimit+d))}:t));
   const giveRetry=(sid,tid)=>setStudents(p=>p.map(s=>s.id===sid?{...s,attempts:s.attempts.map(a=>a.testId===tid?{...a,canRetry:true}:a)}:s));
 
@@ -259,6 +270,13 @@ const TeacherDashboard = ({ tests, setTests, students, setStudents, onSaveTest, 
 
   return (
     <div style={{minHeight:"100vh",background:"#0f172a",paddingBottom:72}}>
+      {deleteConfirm && (
+        <ConfirmModal
+          message="Bu testni o'chirib yubormoqchimisiz?"
+          onConfirm={confirmDelete}
+          onCancel={()=>setDeleteConfirm(null)}
+        />
+      )}
       {/* Top bar: faqat logo + chiqish */}
       <div style={{background:"rgba(255,255,255,0.03)",borderBottom:"1px solid rgba(255,255,255,0.07)",
         padding:"0 14px",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -798,7 +816,7 @@ const LS = {
    N8N → Webhook node → Production URL ni nusxalang
    Ko'rinishi: https://xxxx.app.n8n.cloud/webhook/xxxx
 ══════════════════════════════════════════════════════ */
-const WEBHOOK_URL = "https://umid.app.n8n.cloud/webhook/Edu-stats";
+const WEBHOOK_URL = "SHU_YERGA_N8N_WEBHOOK_URL_QO'YING";
 
 /* ══ N8N ga ma'lumot yuborish ══
    type: "save_test"     → test saqlanganda
@@ -874,7 +892,7 @@ function App() {
             timeLimit:  Number(t.vaqt)  || 20,
             qCount:     Number(t.savollar) || 10,
             answerKey:  (() => { try { return JSON.parse(t.javoblar); } catch{ return {}; } })(),
-            active:     t.aktiv === "true" || t.aktiv === true,
+            active:     String(t.aktiv).toLowerCase() === "true",
             createdAt:  t.yaratilgan,
           }));
           setTestsRaw(loaded);
