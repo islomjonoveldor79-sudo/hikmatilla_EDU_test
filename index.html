@@ -989,6 +989,29 @@ function App() {
   const handleLogin  = () => { setTeacherLoggedIn(true);  LS.set("edutest_logged",true);  setView("teacher"); };
   const handleLogout = () => { setTeacherLoggedIn(false); LS.set("edutest_logged",false); setView("landing"); };
 
+  // O'quvchi bosqanda N8N dan testlarni yangilab keyin sahifaga o'tadi
+  const handleGoStudent = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const testsRes = await n8nCall("LOAD_TESTS");
+      if (testsRes?.tests?.length > 0) {
+        const loaded = testsRes.tests.map(t=>({
+          id:        Number(t.testId) || t.testId,
+          title:     t.nomi,
+          timeLimit: Number(t.vaqt) || 20,
+          qCount:    Number(t.savollar) || 10,
+          answerKey: (() => { try { return JSON.parse(t.javoblar); } catch{ return {}; } })(),
+          active:    String(t.aktiv).toLowerCase() === "true",
+          createdAt: t.yaratilgan,
+        }));
+        setTestsRaw(loaded);
+        LS.set("edutest_tests", loaded);
+      }
+    } catch(e) { console.warn("N8N yuklash xato:", e); }
+    setSyncing(false);
+    setView("student-entry");
+  }, [n8nCall]);
+
   return (
     <>
       {/* Sinxronlash ko'rsatkichi */}
@@ -999,7 +1022,7 @@ function App() {
           <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
         </div>
       )}
-      {view==="landing"&&<LandingPage onTeacher={()=>teacherLoggedIn?setView("teacher"):setView("teacher-login")} onStudent={()=>setView("student-entry")}/>}
+      {view==="landing"&&<LandingPage onTeacher={()=>teacherLoggedIn?setView("teacher"):setView("teacher-login")} onStudent={handleGoStudent}/>}
       {view==="teacher-login"&&<TeacherLogin onLogin={handleLogin} onBack={()=>setView("landing")}/>}
       {view==="teacher"&&<TeacherDashboard tests={tests} setTests={setTests} students={students} setStudents={setStudents} onSaveTest={handleSaveTest} onLogout={handleLogout}/>}
       {view==="student-entry"&&<StudentEntry tests={tests} students={students} setStudents={setStudents} onStart={handleStart} onBack={()=>setView("landing")}/>}
