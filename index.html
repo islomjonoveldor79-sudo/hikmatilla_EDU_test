@@ -196,10 +196,13 @@ const LoadingPage = ({text="Yuklanmoqda..."}) => (
 // LOGIN SAHIFASI
 // ═══════════════════════════════════════════════════
 const LoginPage = ({onLogin}) => {
-  const [mode,setMode]   = useState("login"); // login | register
-  const [form,setForm]   = useState({email:"",password:"",full_name:"",role:"student"});
+  const [mode,setMode]   = useState("login");
+  const [loginForm,setLoginForm]   = useState({email:"",password:""});
+  const [regForm,setRegForm]       = useState({email:"",password:"",full_name:"",role:"student"});
   const [err,setErr]     = useState("");
   const [loading,setLoading] = useState(false);
+  const form = mode==="login" ? loginForm : regForm;
+  const setForm = mode==="login" ? setLoginForm : setRegForm;
 
   const handleLogin = async () => {
     if(!form.email||!form.password) return setErr("Email va parol kiriting!");
@@ -218,7 +221,7 @@ const LoginPage = ({onLogin}) => {
       options:{data:{full_name:form.full_name, role:form.role}}
     });
     if(error) setErr(error.message);
-    else { setErr(""); setForm({email:"",password:"",full_name:"",role:"student"}); setMode("login"); alert("✅ Ro'yxatdan o'tildi! Endi kiring."); }
+    else { setErr(""); setRegForm({email:"",password:"",full_name:"",role:"student"}); setMode("login"); alert("✅ Ro'yxatdan o'tildi! Endi kiring."); }
     setLoading(false);
   };
 
@@ -241,7 +244,7 @@ const LoginPage = ({onLogin}) => {
           {/* Tab */}
           <div style={{display:"flex",background:"rgba(0,0,0,.3)",borderRadius:10,padding:3,marginBottom:24}}>
             {[["login","Kirish"],["register","Ro'yxat"]].map(([k,v])=>(
-              <button key={k} onClick={()=>{setMode(k);setErr("");setForm({email:"",password:"",full_name:"",role:"student"});}} style={{
+              <button key={k} onClick={()=>{setMode(k);setErr("");}} style={{
                 flex:1,padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontWeight:600,
                 fontSize:14,transition:"all .2s",WebkitTapHighlightColor:"transparent",
                 background:mode===k?"linear-gradient(135deg,#3b82f6,#2563eb)":"transparent",
