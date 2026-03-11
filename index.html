@@ -218,7 +218,7 @@ const LoginPage = ({onLogin}) => {
       options:{data:{full_name:form.full_name, role:form.role}}
     });
     if(error) setErr(error.message);
-    else { setErr(""); setMode("login"); alert("✅ Ro'yxatdan o'tildi! Endi kiring."); }
+    else { setErr(""); setForm({email:"",password:"",full_name:"",role:"student"}); setMode("login"); alert("✅ Ro'yxatdan o'tildi! Endi kiring."); }
     setLoading(false);
   };
 
@@ -241,7 +241,7 @@ const LoginPage = ({onLogin}) => {
           {/* Tab */}
           <div style={{display:"flex",background:"rgba(0,0,0,.3)",borderRadius:10,padding:3,marginBottom:24}}>
             {[["login","Kirish"],["register","Ro'yxat"]].map(([k,v])=>(
-              <button key={k} onClick={()=>{setMode(k);setErr("");}} style={{
+              <button key={k} onClick={()=>{setMode(k);setErr("");setForm({email:"",password:"",full_name:"",role:"student"});}} style={{
                 flex:1,padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontWeight:600,
                 fontSize:14,transition:"all .2s",WebkitTapHighlightColor:"transparent",
                 background:mode===k?"linear-gradient(135deg,#3b82f6,#2563eb)":"transparent",
@@ -1154,7 +1154,26 @@ function App() {
   },[]);
 
   const loadProfile = async (uid) => {
-    const {data} = await sb.from("profiles").select("*").eq("id",uid).single();
+    if(!uid) { setAuthLoading(false); return; }
+    // 3 marta urinib ko'rish — trigger kechikishi mumkin
+    let data = null;
+    for(let i=0; i<3; i++){
+      const res = await sb.from("profiles").select("*").eq("id",uid).single();
+      if(res.data){ data=res.data; break; }
+      await new Promise(r=>setTimeout(r,800));
+    }
+    // Profil topilmasa avtomatik yaratish
+    if(!data){
+      const {data:user} = await sb.auth.getUser();
+      const meta = user?.user?.user_metadata||{};
+      await sb.from("profiles").upsert({
+        id: uid,
+        full_name: meta.full_name || "Foydalanuvchi",
+        role: meta.role || "student"
+      });
+      const res2 = await sb.from("profiles").select("*").eq("id",uid).single();
+      data = res2.data;
+    }
     setProfile(data||null);
     setAuthLoading(false);
   };
