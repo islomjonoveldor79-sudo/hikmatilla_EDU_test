@@ -162,8 +162,12 @@ const LoginPage = () => {
     setErr("");
     if(!lf.email||!lf.password) return setErr("Email va parol kiriting!");
     setLoading(true);
-    const {error}=await sb.auth.signInWithPassword({email:lf.email,password:lf.password});
-    if(error) setErr("Email yoki parol noto'g'ri!");
+    const {data:sd,error}=await sb.auth.signInWithPassword({email:lf.email,password:lf.password});
+    if(error){
+      if(error.message.includes("Email not confirmed")) setErr("Email tasdiqlanmagan! Admin bilan bog'laning.");
+      else if(error.message.includes("Invalid login")) setErr("Email yoki parol noto'g'ri!");
+      else setErr(error.message);
+    }
     setLoading(false);
   };
 
@@ -175,7 +179,7 @@ const LoginPage = () => {
     const {data,error}=await sb.auth.signUp({email:rf.email,password:rf.password,options:{data:{full_name:rf.full_name,role:rf.role}}});
     if(error){setErr(error.message);setLoading(false);return;}
     if(data?.user){
-      await sb.from("profiles").upsert({id:data.user.id,full_name:rf.full_name,role:rf.role},{onConflict:"id"});
+      await sb.from("profiles").upsert({id:data.user.id,full_name:rf.full_name,role:rf.role,email:rf.email},{onConflict:"id"});
     }
     if(!data?.session){
       setRf({email:"",password:"",full_name:"",role:"student"});
@@ -423,7 +427,7 @@ const TeacherPanel = ({profile,onLogout}) => {
             )}
             {!tests.length&&!building&&<Card style={{textAlign:"center",padding:48}}><div style={{fontSize:48,marginBottom:12}}>📋</div><p style={{color:"var(--text3)"}}>Hali test yaratilmagan</p></Card>}
             {tests.map(t=>{
-              const imgs=t.image_urls||[];
+              const raw=t.image_urls;const imgs=Array.isArray(raw)?raw:(raw?JSON.parse(raw):[]);
               return (
                 <Card key={t.id} style={{marginBottom:10}}>
                   <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:10}}>
@@ -637,7 +641,8 @@ const TestPage = ({profile,test,attemptNumber,onFinish}) => {
   },[doFinish]);
 
   const urgent=timeLeft<=60;
-  const imgs=test.image_urls||[];
+  const rawImgs=test.image_urls;
+  const imgs=Array.isArray(rawImgs)?rawImgs:(typeof rawImgs==="string"?JSON.parse(rawImgs||"[]"):[]);
   const answered=Object.keys(answers).length;
 
   const QuestionNav=()=>(
@@ -837,12 +842,13 @@ const AdminPanel = ({profile,onLogout}) => {
             <Card>
               <div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",minWidth:340}}>
-                  <thead><tr style={{borderBottom:"1px solid var(--border)"}}>{["#","Ism","Qo'shilgan"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--text3)",fontSize:12,fontWeight:600,textAlign:"left"}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{borderBottom:"1px solid var(--border)"}}>{["#","To'liq ism","Email","Qo'shilgan"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--text3)",fontSize:12,fontWeight:600,textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
                   <tbody>
                     {(userTab==="teachers"?teachers:students).map((u,i)=>(
                       <tr key={u.id} style={{borderBottom:"1px solid rgba(255,255,255,.04)"}}>
                         <td style={{padding:"10px 10px",color:"var(--text3)",fontSize:13}}>{i+1}</td>
                         <td style={{padding:"10px 10px",color:"var(--text)",fontWeight:600,fontSize:14}}>{u.full_name}</td>
+                        <td style={{padding:"10px 10px",color:"var(--blue)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{u.email||"—"}</td>
                         <td style={{padding:"10px 10px",color:"var(--text3)",fontSize:12}}>{new Date(u.created_at).toLocaleDateString("uz-UZ")}</td>
                       </tr>
                     ))}
@@ -882,30 +888,48 @@ function App() {
   const [user,setUser]=useState(null);
   const [profile,setProfile]=useState(null);
   const [authLoading,setAuthLoading]=useState(true);
+  const [profileError,setProfileError]=useState("");
   const [session,setSession]=useState(null);
   const [lastResult,setLastResult]=useState(null);
 
-  const loadProfile=useCallback(async uid=>{
+  const loadProfile=useCallback(async (uid,authUser)=>{
     if(!uid){setAuthLoading(false);return;}
+    setProfileError("");
+    // 1: DB dan profil qidirish
     let data=null;
-    for(let i=0;i<4;i++){
-      const {data:d}=await sb.from("profiles").select("*").eq("id",uid).single();
+    for(let i=0;i<5;i++){
+      const {data:d,error:e}=await sb.from("profiles").select("*").eq("id",uid).single();
       if(d){data=d;break;}
-      await new Promise(r=>setTimeout(r,700));
+      await new Promise(r=>setTimeout(r,800));
     }
+    // 2: Topilmasa — yaratish
     if(!data){
-      const {data:au}=await sb.auth.getUser();
-      const meta=au?.user?.user_metadata||{};
-      await sb.from("profiles").upsert({id:uid,full_name:meta.full_name||"Foydalanuvchi",role:meta.role||"student"},{onConflict:"id"});
-      const {data:d2}=await sb.from("profiles").select("*").eq("id",uid).single();
-      data=d2;
+      const email=authUser?.email||"";
+      const meta=authUser?.user_metadata||{};
+      const {error:uErr}=await sb.from("profiles").upsert({
+        id:uid,
+        full_name:meta.full_name||email.split("@")[0]||"Foydalanuvchi",
+        role:meta.role||"student",
+        email:email
+      },{onConflict:"id"});
+      if(!uErr){
+        const {data:d2}=await sb.from("profiles").select("*").eq("id",uid).single();
+        data=d2;
+      }
     }
-    setProfile(data||null);setAuthLoading(false);
+    if(data){setProfile(data);setAuthLoading(false);}
+    else{setProfileError("Profilingiz topilmadi. Iltimos qayta kiring.");setAuthLoading(false);}
   },[]);
 
   useEffect(()=>{
-    sb.auth.getSession().then(({data:{session:s}})=>{setUser(s?.user||null);if(s?.user)loadProfile(s.user.id);else setAuthLoading(false);});
-    const {data:{subscription}}=sb.auth.onAuthStateChange((_,s)=>{setUser(s?.user||null);if(s?.user)loadProfile(s.user.id);else{setProfile(null);setAuthLoading(false);}});
+    sb.auth.getSession().then(({data:{session:s}})=>{
+      const u=s?.user||null;setUser(u);
+      if(u)loadProfile(u.id,u);else setAuthLoading(false);
+    });
+    const {data:{subscription}}=sb.auth.onAuthStateChange((_,s)=>{
+      const u=s?.user||null;setUser(u);
+      if(u)loadProfile(u.id,u);else{setProfile(null);setProfileError("");setAuthLoading(false);}
+    });
     return()=>subscription.unsubscribe();
   },[loadProfile]);
 
@@ -921,7 +945,16 @@ function App() {
   };
 
   if(authLoading) return <LoadingPage text="Tizim yuklanmoqda..."/>;
-  if(!user||!profile) return <LoginPage/>;
+  if(!user) return <LoginPage/>;
+  if(profileError) return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:20,background:"var(--bg)"}}>
+      <div style={{fontSize:48}}>⚠️</div>
+      <p style={{color:"var(--red)",fontSize:16,textAlign:"center",maxWidth:320}}>{profileError}</p>
+      <Btn onClick={async()=>{setProfileError("");setAuthLoading(true);await loadProfile(user.id,user);}} variant="primary">Qayta urinish</Btn>
+      <Btn onClick={async()=>{await sb.auth.signOut();}} variant="ghost" size="sm">Chiqish</Btn>
+    </div>
+  );
+  if(!profile) return <LoadingPage text="Profil yuklanmoqda..."/>;
   if(session) return <TestPage profile={profile} test={session.test} attemptNumber={session.attemptNumber} onFinish={handleFinish}/>;
   if(lastResult) return <ResultPage profile={profile} test={lastResult.test} attempt={lastResult} onBack={()=>setLastResult(null)}/>;
   if(profile.role==="admin") return <AdminPanel profile={profile} onLogout={handleLogout}/>;
