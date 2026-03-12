@@ -16,21 +16,10 @@
 html{-webkit-text-size-adjust:100%;height:100%}
 body{font-family:'Outfit',sans-serif;background:#0a0f1e;color:#e2e8f0;overflow-x:hidden;min-height:100vh}
 :root{
-  --bg:       #0a0f1e;
-  --bg2:      #111827;
-  --bg3:      #1a2235;
-  --border:   rgba(255,255,255,0.08);
-  --border2:  rgba(255,255,255,0.14);
-  --text:     #f1f5f9;
-  --text2:    #94a3b8;
-  --text3:    #64748b;
-  --blue:     #3b82f6;
-  --blue2:    #2563eb;
-  --green:    #22c55e;
-  --red:      #ef4444;
-  --yellow:   #f59e0b;
-  --purple:   #8b5cf6;
-  --cyan:     #06b6d4;
+  --bg:#0a0f1e;--bg2:#111827;--bg3:#1a2235;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --text:#f1f5f9;--text2:#94a3b8;--text3:#64748b;
+  --blue:#3b82f6;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--purple:#8b5cf6;
 }
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:var(--bg2)}
@@ -42,107 +31,70 @@ input,select,button,textarea{font-family:'Outfit',sans-serif}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .spin{animation:spin .8s linear infinite}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px}
 .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:28px;max-width:380px;width:100%;animation:fadeUp .2s ease}
-
-/* Pinch-zoom image */
-.img-zoom-wrap{overflow:hidden;border-radius:12px;touch-action:pinch-zoom;cursor:zoom-in;background:var(--bg3);border:1px solid var(--border)}
-.img-zoom-wrap img{width:100%;display:block;user-select:none;-webkit-user-drag:none}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:flex;align-items:center;justify-content:center}
+.lightbox img{max-width:96vw;max-height:92vh;object-fit:contain;border-radius:8px;display:block}
+.gallery-wrap{position:relative;border-radius:12px;overflow:hidden;background:var(--bg3);border:1px solid var(--border);margin-bottom:14px}
+.gallery-img{width:100%;display:block;object-fit:contain;max-height:340px;cursor:zoom-in}
+.gnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.65);border:none;color:#fff;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);z-index:2}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect, useRef, useCallback, useMemo } = React;
+const { useState, useEffect, useRef, useCallback } = React;
 
-// ═══════════════════════════════════════════════════
-// SUPABASE ULANISH — BU YERGA O'Z KALITLARINGIZNI QO'YING
-// ═══════════════════════════════════════════════════
 const SUPA_URL = "https://lyjhbzyykubeuvenmbjc.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5amhienl5a3ViZXV2ZW5tYmpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNDg0OTQsImV4cCI6MjA4ODgyNDQ5NH0.qOyZrI4GzJKPfw81kS4z22l9r8tt3mGNdMNVJHgCjmc";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-// ═══════════════════════════════════════════════════
-// YORDAMCHI FUNKSIYALAR
-// ═══════════════════════════════════════════════════
 const fmt = s => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
-const getGrade = (correct, total) => {
-  if(!total) return 1;
-  const p = (correct/total)*100;
-  if(p>=86) return 5; if(p>=71) return 4; if(p>=56) return 3; if(p>=41) return 2; return 1;
-};
+const getGrade = (score,total) => { if(!total) return 1; const p=(score/total)*100; if(p>=86)return 5;if(p>=71)return 4;if(p>=56)return 3;if(p>=41)return 2;return 1; };
 const gradeColor = g => ({5:"#22c55e",4:"#84cc16",3:"#eab308",2:"#f97316",1:"#ef4444"}[g]||"#94a3b8");
-const LETTERS = ["A","B","C","D"];
-const LC = {A:"#3b82f6",B:"#22c55e",C:"#f59e0b",D:"#ef4444"};
+const LETTERS=["A","B","C","D"];
+const LC={A:"#3b82f6",B:"#22c55e",C:"#f59e0b",D:"#ef4444"};
 
-// ═══════════════════════════════════════════════════
-// UI KOMPONENTLAR
-// ═══════════════════════════════════════════════════
 const Spinner = ({size=24,color="var(--blue)"}) => (
-  <div style={{width:size,height:size,border:`2px solid transparent`,borderTopColor:color,borderRadius:"50%"}} className="spin"/>
+  <div style={{width:size,height:size,border:`2px solid transparent`,borderTopColor:color,borderRadius:"50%",flexShrink:0}} className="spin"/>
 );
 
 const Btn = ({children,onClick,variant="primary",size="md",disabled,full,style:sx={}}) => {
-  const pad = size==="sm"?"7px 16px":size==="lg"?"14px 28px":"10px 20px";
-  const fs  = size==="sm"?"13px":size==="lg"?"16px":"14px";
-  const variants = {
-    primary: {background:"linear-gradient(135deg,#3b82f6,#2563eb)",color:"#fff",boxShadow:"0 4px 16px rgba(59,130,246,.3)"},
-    success: {background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",boxShadow:"0 4px 16px rgba(34,197,94,.3)"},
-    danger:  {background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",boxShadow:"0 4px 16px rgba(239,68,68,.3)"},
-    warning: {background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff",boxShadow:"0 4px 16px rgba(245,158,11,.3)"},
-    purple:  {background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",color:"#fff",boxShadow:"0 4px 16px rgba(139,92,246,.3)"},
-    ghost:   {background:"rgba(255,255,255,.05)",color:"#94a3b8",border:"1px solid rgba(255,255,255,.1)"},
-    outline: {background:"transparent",color:"#3b82f6",border:"1px solid #3b82f6"},
+  const pad=size==="sm"?"7px 14px":size==="lg"?"14px 28px":"10px 18px";
+  const fs=size==="sm"?"13px":size==="lg"?"16px":"14px";
+  const V={
+    primary:{background:"linear-gradient(135deg,#3b82f6,#2563eb)",color:"#fff",boxShadow:"0 4px 14px rgba(59,130,246,.3)"},
+    success:{background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",boxShadow:"0 4px 14px rgba(34,197,94,.3)"},
+    danger: {background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",boxShadow:"0 4px 14px rgba(239,68,68,.3)"},
+    warning:{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff",boxShadow:"0 4px 14px rgba(245,158,11,.3)"},
+    purple: {background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",color:"#fff",boxShadow:"0 4px 14px rgba(139,92,246,.3)"},
+    ghost:  {background:"rgba(255,255,255,.05)",color:"#94a3b8",border:"1px solid rgba(255,255,255,.1)"},
+    outline:{background:"transparent",color:"#3b82f6",border:"1px solid #3b82f6"},
   };
-  return (
-    <button onClick={disabled?undefined:onClick} style={{
-      border:"none",borderRadius:10,fontWeight:600,cursor:disabled?"not-allowed":"pointer",
-      transition:"all .2s",opacity:disabled?.45:1,touchAction:"manipulation",
-      padding:pad,fontSize:fs,WebkitTapHighlightColor:"transparent",userSelect:"none",
-      width:full?"100%":"auto",...variants[variant],...sx
-    }}>{children}</button>
-  );
+  return <button onClick={disabled?undefined:onClick} style={{border:"none",borderRadius:10,fontWeight:600,cursor:disabled?"not-allowed":"pointer",transition:"all .2s",opacity:disabled?.45:1,touchAction:"manipulation",padding:pad,fontSize:fs,WebkitTapHighlightColor:"transparent",userSelect:"none",width:full?"100%":"auto",...V[variant],...sx}}>{children}</button>;
 };
 
 const Input = ({label,error,...props}) => (
   <div style={{marginBottom:16}}>
-    {label && <label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{label}</label>}
-    <input {...props} style={{
-      width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",
-      border:`1px solid ${error?"var(--red)":"var(--border2)"}`,borderRadius:10,
-      color:"var(--text)",fontSize:15,outline:"none",WebkitAppearance:"none",
-      transition:"border-color .2s",...(props.style||{})
-    }}
-    onFocus={e=>e.target.style.borderColor="var(--blue)"}
-    onBlur={e=>e.target.style.borderColor=error?"var(--red)":"var(--border2)"}/>
-    {error && <p style={{color:"var(--red)",fontSize:12,marginTop:4}}>⚠ {error}</p>}
+    {label&&<label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{label}</label>}
+    <input {...props} style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",border:`1px solid ${error?"var(--red)":"var(--border2)"}`,borderRadius:10,color:"var(--text)",fontSize:15,outline:"none",WebkitAppearance:"none",transition:"border-color .2s",...(props.style||{})}} onFocus={e=>e.target.style.borderColor="var(--blue)"} onBlur={e=>e.target.style.borderColor=error?"var(--red)":"var(--border2)"}/>
+    {error&&<p style={{color:"var(--red)",fontSize:12,marginTop:4}}>⚠ {error}</p>}
   </div>
 );
 
 const Card = ({children,style:sx={},className=""}) => (
-  <div className={className} style={{background:"rgba(255,255,255,.03)",border:"1px solid var(--border)",borderRadius:16,padding:20,...sx}}>
-    {children}
-  </div>
+  <div className={className} style={{background:"rgba(255,255,255,.03)",border:"1px solid var(--border)",borderRadius:16,padding:20,...sx}}>{children}</div>
 );
 
 const Badge = ({children,color="var(--blue)"}) => (
-  <span style={{background:color+"22",color,border:`1px solid ${color}44`,borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:600}}>
-    {children}
-  </span>
+  <span style={{background:color+"22",color,border:`1px solid ${color}44`,borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:600}}>{children}</span>
 );
 
 const Alert = ({type="error",children}) => {
-  const c = type==="error"?"var(--red)":type==="success"?"var(--green)":"var(--yellow)";
-  return (
-    <div style={{background:c+"18",border:`1px solid ${c}44`,borderRadius:10,padding:"10px 14px",fontSize:13,color:c,marginBottom:12}}>
-      {children}
-    </div>
-  );
+  const c=type==="error"?"var(--red)":type==="success"?"var(--green)":"var(--yellow)";
+  return <div style={{background:c+"18",border:`1px solid ${c}44`,borderRadius:10,padding:"10px 14px",fontSize:13,color:c,marginBottom:12}}>{children}</div>;
 };
 
-// ═══════════════════════════════════════════════════
-// CONFIRM MODAL
-// ═══════════════════════════════════════════════════
 const ConfirmModal = ({message,confirmText="Ha, o'chirish",danger=true,onConfirm,onCancel}) => (
   <div className="modal-bg" onClick={onCancel}>
     <div className="modal" onClick={e=>e.stopPropagation()}>
@@ -156,186 +108,158 @@ const ConfirmModal = ({message,confirmText="Ha, o'chirish",danger=true,onConfirm
   </div>
 );
 
-// ═══════════════════════════════════════════════════
-// RASM PINCH-ZOOM KOMPONENTI
-// ═══════════════════════════════════════════════════
-const ZoomImage = ({src,alt="Test rasmi"}) => {
-  const [open,setOpen] = useState(false);
-  if(!src) return null;
+const LoadingPage = ({text="Yuklanmoqda..."}) => (
+  <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+    <Spinner size={40}/><p style={{color:"var(--text2)",fontSize:14}}>{text}</p>
+  </div>
+);
+
+// ── GALEREYA (max 5 rasm + lightbox) ────────────────────────
+const Gallery = ({images=[]}) => {
+  const [idx,setIdx]=useState(0);
+  const [open,setOpen]=useState(false);
+  const imgs=images.filter(Boolean);
+  if(!imgs.length) return null;
+  const prev=e=>{e.stopPropagation();setIdx(i=>(i-1+imgs.length)%imgs.length);};
+  const next=e=>{e.stopPropagation();setIdx(i=>(i+1)%imgs.length);};
   return (
     <>
-      <div className="img-zoom-wrap" onClick={()=>setOpen(true)} style={{marginBottom:16,maxHeight:280,overflow:"hidden"}}>
-        <img src={src} alt={alt} style={{width:"100%",objectFit:"contain",maxHeight:280}}/>
-        <div style={{position:"absolute",bottom:8,right:8,background:"rgba(0,0,0,.6)",borderRadius:6,padding:"4px 8px",fontSize:11,color:"#fff",pointerEvents:"none"}}>
-          🔍 Kattalashtirish
-        </div>
-      </div>
-      {open && (
-        <div className="modal-bg" onClick={()=>setOpen(false)} style={{zIndex:9999}}>
-          <div style={{position:"relative",maxWidth:"95vw",maxHeight:"90vh"}}>
-            <img src={src} alt={alt} style={{maxWidth:"95vw",maxHeight:"85vh",objectFit:"contain",borderRadius:12,display:"block"}}/>
-            <button onClick={()=>setOpen(false)} style={{position:"absolute",top:-12,right:-12,width:32,height:32,borderRadius:"50%",background:"var(--red)",border:"none",color:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+      <div className="gallery-wrap">
+        <img src={imgs[idx]} alt={`Rasm ${idx+1}`} className="gallery-img" onClick={()=>setOpen(true)}/>
+        {imgs.length>1&&<><button className="gnav" onClick={prev} style={{left:8}}>&#8249;</button><button className="gnav" onClick={next} style={{right:8}}>&#8250;</button></>}
+        <div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.6)",borderRadius:6,padding:"3px 8px",fontSize:11,color:"#fff",pointerEvents:"none"}}>🔍 Bosib kattalashtiring</div>
+        {imgs.length>1&&(
+          <div style={{display:"flex",gap:6,justifyContent:"center",padding:"8px 0",background:"rgba(0,0,0,.3)"}}>
+            {imgs.map((_,i)=><button key={i} onClick={()=>setIdx(i)} style={{width:i===idx?18:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i===idx?"var(--blue)":"rgba(255,255,255,.3)",transition:"all .2s"}}/>)}
           </div>
+        )}
+      </div>
+      {open&&(
+        <div className="lightbox" onClick={()=>setOpen(false)}>
+          <button onClick={()=>setOpen(false)} style={{position:"absolute",top:14,right:14,width:36,height:36,borderRadius:"50%",background:"var(--red)",border:"none",color:"#fff",fontSize:20,cursor:"pointer",zIndex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          {imgs.length>1&&<><button className="gnav" onClick={prev} style={{left:12,position:"absolute",width:46,height:46}}>&#8249;</button><button className="gnav" onClick={next} style={{right:12,position:"absolute",width:46,height:46}}>&#8250;</button></>}
+          <img src={imgs[idx]} alt="katta" onClick={e=>e.stopPropagation()}/>
+          {imgs.length>1&&(
+            <div style={{position:"absolute",bottom:14,left:0,right:0,display:"flex",justifyContent:"center",gap:6}}>
+              {imgs.map((_,i)=><button key={i} onClick={e=>{e.stopPropagation();setIdx(i);}} style={{width:i===idx?18:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i===idx?"var(--blue)":"rgba(255,255,255,.4)",transition:"all .2s"}}/>)}
+            </div>
+          )}
         </div>
       )}
     </>
   );
 };
 
-// ═══════════════════════════════════════════════════
-// LOADING SAHIFASI
-// ═══════════════════════════════════════════════════
-const LoadingPage = ({text="Yuklanmoqda..."}) => (
-  <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
-    <Spinner size={40}/>
-    <p style={{color:"var(--text2)",fontSize:14}}>{text}</p>
-  </div>
-);
-
-// ═══════════════════════════════════════════════════
-// LOGIN SAHIFASI
-// ═══════════════════════════════════════════════════
-const LoginPage = ({onLogin}) => {
-  const [mode,setMode]   = useState("login");
-  const [loginForm,setLoginForm]   = useState({email:"",password:""});
-  const [regForm,setRegForm]       = useState({email:"",password:"",full_name:"",role:"student"});
-  const [err,setErr]     = useState("");
-  const [loading,setLoading] = useState(false);
-  const form = mode==="login" ? loginForm : regForm;
-  const setForm = mode==="login" ? setLoginForm : setRegForm;
+// ── LOGIN ────────────────────────────────────────────────────
+const LoginPage = () => {
+  const [mode,setMode]=useState("login");
+  const [lf,setLf]=useState({email:"",password:""});
+  const [rf,setRf]=useState({email:"",password:"",full_name:"",role:"student"});
+  const [err,setErr]=useState("");
+  const [loading,setLoading]=useState(false);
 
   const handleLogin = async () => {
-    if(!form.email||!form.password) return setErr("Email va parol kiriting!");
-    setLoading(true); setErr("");
-    const {error} = await sb.auth.signInWithPassword({email:form.email,password:form.password});
+    setErr("");
+    if(!lf.email||!lf.password) return setErr("Email va parol kiriting!");
+    setLoading(true);
+    const {error}=await sb.auth.signInWithPassword({email:lf.email,password:lf.password});
     if(error) setErr("Email yoki parol noto'g'ri!");
     setLoading(false);
   };
 
   const handleRegister = async () => {
-    if(!form.email||!form.password||!form.full_name) return setErr("Barcha maydonlarni to'ldiring!");
-    if(form.password.length<6) return setErr("Parol kamida 6 ta belgi bo'lsin!");
-    setLoading(true); setErr("");
-    const {error} = await sb.auth.signUp({
-      email:form.email, password:form.password,
-      options:{data:{full_name:form.full_name, role:form.role}}
-    });
-    if(error) setErr(error.message);
-    else { setErr(""); setRegForm({email:"",password:"",full_name:"",role:"student"}); setMode("login"); alert("✅ Ro'yxatdan o'tildi! Endi kiring."); }
+    setErr("");
+    if(!rf.email||!rf.password||!rf.full_name) return setErr("Barcha maydonlarni to'ldiring!");
+    if(rf.password.length<6) return setErr("Parol kamida 6 ta belgi!");
+    setLoading(true);
+    const {data,error}=await sb.auth.signUp({email:rf.email,password:rf.password,options:{data:{full_name:rf.full_name,role:rf.role}}});
+    if(error){setErr(error.message);setLoading(false);return;}
+    if(data?.user){
+      await sb.from("profiles").upsert({id:data.user.id,full_name:rf.full_name,role:rf.role},{onConflict:"id"});
+    }
+    if(!data?.session){
+      setRf({email:"",password:"",full_name:"",role:"student"});
+      setMode("login");
+      setLf({email:rf.email,password:""});
+      alert("✅ Ro'yxatdan o'tildi! Endi kiring.");
+    }
     setLoading(false);
   };
 
-  const f = (k,v) => setForm(p=>({...p,[k]:v}));
-
   return (
-    <div className="fade" style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,
-      background:"radial-gradient(ellipse at 30% 20%,rgba(59,130,246,.12) 0%,transparent 60%),radial-gradient(ellipse at 70% 80%,rgba(139,92,246,.08) 0%,transparent 60%),var(--bg)"}}>
+    <div className="fade" style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"radial-gradient(ellipse at 30% 20%,rgba(59,130,246,.12) 0%,transparent 60%),var(--bg)"}}>
       <div style={{width:"100%",maxWidth:400}}>
-        {/* Logo */}
-        <div style={{textAlign:"center",marginBottom:36}}>
-          <div style={{width:72,height:72,borderRadius:20,margin:"0 auto 16px",
-            background:"linear-gradient(135deg,#3b82f6,#8b5cf6)",display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:34,boxShadow:"0 8px 32px rgba(99,102,241,.4)"}}>🎓</div>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{width:72,height:72,borderRadius:20,margin:"0 auto 14px",background:"linear-gradient(135deg,#3b82f6,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,boxShadow:"0 8px 32px rgba(99,102,241,.4)"}}>🎓</div>
           <h1 style={{fontSize:28,fontWeight:800,color:"var(--text)",letterSpacing:-1}}>Testlyy</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:6}}>Maktab test platformasi</p>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:4}}>Maktab test platformasi</p>
         </div>
-
         <Card style={{padding:28}}>
-          {/* Tab */}
           <div style={{display:"flex",background:"rgba(0,0,0,.3)",borderRadius:10,padding:3,marginBottom:24}}>
             {[["login","Kirish"],["register","Ro'yxat"]].map(([k,v])=>(
-              <button key={k} onClick={()=>{setMode(k);setErr("");}} style={{
-                flex:1,padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontWeight:600,
-                fontSize:14,transition:"all .2s",WebkitTapHighlightColor:"transparent",
-                background:mode===k?"linear-gradient(135deg,#3b82f6,#2563eb)":"transparent",
-                color:mode===k?"#fff":"var(--text3)"}}>{v}</button>
+              <button key={k} onClick={()=>{setMode(k);setErr("");}} style={{flex:1,padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontWeight:600,fontSize:14,transition:"all .2s",WebkitTapHighlightColor:"transparent",background:mode===k?"linear-gradient(135deg,#3b82f6,#2563eb)":"transparent",color:mode===k?"#fff":"var(--text3)"}}>{v}</button>
             ))}
           </div>
-
-          {mode==="register" && <>
-            <Input label="To'liq ism" value={form.full_name} onChange={e=>f("full_name",e.target.value)} placeholder="Abdullayev Jasur"/>
+          {mode==="register"?<>
+            <Input label="To'liq ism" value={rf.full_name} onChange={e=>setRf(p=>({...p,full_name:e.target.value}))} placeholder="Abdullayev Jasur"/>
             <div style={{marginBottom:16}}>
-              <label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>Rol</label>
-              <select value={form.role} onChange={e=>f("role",e.target.value)} style={{
-                width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",
-                border:"1px solid var(--border2)",borderRadius:10,color:"var(--text)",fontSize:15,outline:"none"}}>
+              <label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:6,fontWeight:600,textTransform:"uppercase"}}>Rol</label>
+              <select value={rf.role} onChange={e=>setRf(p=>({...p,role:e.target.value}))} style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",border:"1px solid var(--border2)",borderRadius:10,color:"var(--text)",fontSize:15,outline:"none"}}>
                 <option value="student">👨‍🎓 O'quvchi</option>
                 <option value="teacher">👨‍🏫 O'qituvchi</option>
               </select>
             </div>
+            <Input label="Email" type="email" value={rf.email} onChange={e=>setRf(p=>({...p,email:e.target.value}))} placeholder="email@maktab.uz" autoCapitalize="none"/>
+            <Input label="Parol" type="password" value={rf.password} onChange={e=>setRf(p=>({...p,password:e.target.value}))} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&handleRegister()}/>
+            {err&&<Alert type="error">{err}</Alert>}
+            <Btn onClick={handleRegister} variant="success" full size="lg" disabled={loading}>{loading?<Spinner size={18} color="#fff"/>:"Ro'yxatdan o'tish →"}</Btn>
+          </>:<>
+            <Input label="Email" type="email" value={lf.email} onChange={e=>setLf(p=>({...p,email:e.target.value}))} placeholder="email@maktab.uz" autoCapitalize="none"/>
+            <Input label="Parol" type="password" value={lf.password} onChange={e=>setLf(p=>({...p,password:e.target.value}))} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&handleLogin()}/>
+            {err&&<Alert type="error">{err}</Alert>}
+            <Btn onClick={handleLogin} variant="primary" full size="lg" disabled={loading}>{loading?<Spinner size={18} color="#fff"/>:"Kirish →"}</Btn>
           </>}
-
-          <Input label="Email" type="email" value={form.email} onChange={e=>f("email",e.target.value)} placeholder="email@maktab.uz" autoCapitalize="none"/>
-          <Input label="Parol" type="password" value={form.password} onChange={e=>f("password",e.target.value)} placeholder="••••••••"
-            onKeyDown={e=>e.key==="Enter"&&(mode==="login"?handleLogin():handleRegister())}/>
-
-          {err && <Alert type="error">{err}</Alert>}
-
-          <Btn onClick={mode==="login"?handleLogin:handleRegister} variant="primary" full size="lg" disabled={loading}>
-            {loading ? <Spinner size={18} color="#fff"/> : mode==="login"?"Kirish →":"Ro'yxatdan o'tish →"}
-          </Btn>
         </Card>
       </div>
     </div>
   );
 };
 
-// ═══════════════════════════════════════════════════
-// JAVOB TANLASH
-// ═══════════════════════════════════════════════════
+// ── JAVOB TANLASH ─────────────────────────────────────────────
 const AnswerPicker = ({value,onChange,size="md"}) => {
-  const w = size==="lg"?58:44;
+  const w=size==="lg"?58:44;
   return (
     <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
       {LETTERS.map(l=>{
         const sel=value===l;
-        return (
-          <button key={l} onClick={()=>onChange(l)} style={{
-            width:w,height:w,borderRadius:12,border:`2px solid ${sel?LC[l]:"rgba(255,255,255,.12)"}`,
-            fontWeight:800,fontSize:size==="lg"?18:15,cursor:"pointer",transition:"all .15s",
-            background:sel?LC[l]:"rgba(255,255,255,.05)",color:sel?"#fff":"#94a3b8",
-            boxShadow:sel?`0 4px 20px ${LC[l]}55`:"none",transform:sel?"scale(1.12)":"scale(1)",
-            touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}}>{l}</button>
-        );
+        return <button key={l} onClick={()=>onChange(l)} style={{width:w,height:w,borderRadius:12,border:`2px solid ${sel?LC[l]:"rgba(255,255,255,.12)"}`,fontWeight:800,fontSize:size==="lg"?18:15,cursor:"pointer",transition:"all .15s",background:sel?LC[l]:"rgba(255,255,255,.05)",color:sel?"#fff":"#94a3b8",boxShadow:sel?`0 4px 20px ${LC[l]}55`:"none",transform:sel?"scale(1.12)":"scale(1)",touchAction:"manipulation",WebkitTapHighlightColor:"transparent"}}>{l}</button>;
       })}
     </div>
   );
 };
 
-// ═══════════════════════════════════════════════════
-// JAVOBLAR KALITI GRID
-// ═══════════════════════════════════════════════════
+// ── JAVOBLAR KALITI ───────────────────────────────────────────
 const AnswerKeyGrid = ({answerKey,setAnswerKey,qCount}) => {
-  const filled = Object.keys(answerKey).length;
+  const filled=Object.keys(answerKey).length;
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <p style={{color:"var(--text2)",fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Javoblar kaliti</p>
-        <span style={{color:filled===qCount?"var(--green)":"var(--yellow)",fontSize:13,fontWeight:700}}>{filled}/{qCount} {filled===qCount?"✅":""}</span>
+        <p style={{color:"var(--text2)",fontSize:12,fontWeight:700,textTransform:"uppercase"}}>Javoblar kaliti</p>
+        <span style={{color:filled===qCount?"var(--green)":"var(--yellow)",fontSize:13,fontWeight:700}}>{filled}/{qCount}{filled===qCount?" ✅":""}</span>
       </div>
-      <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{color:"var(--text3)",fontSize:12}}>Hammasini:</span>
-        {LETTERS.map(l=>(
-          <button key={l} onClick={()=>{const k={};for(let i=1;i<=qCount;i++)k[i]=l;setAnswerKey(k);}}
-            style={{padding:"4px 12px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,
-              background:LC[l]+"22",color:LC[l],WebkitTapHighlightColor:"transparent"}}>{l}</button>
-        ))}
+      <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{color:"var(--text3)",fontSize:12}}>Barchasi:</span>
+        {LETTERS.map(l=><button key={l} onClick={()=>{const k={};for(let i=1;i<=qCount;i++)k[i]=l;setAnswerKey(k);}} style={{padding:"4px 12px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:LC[l]+"22",color:LC[l]}}>{l}</button>)}
         <button onClick={()=>setAnswerKey({})} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,background:"rgba(255,255,255,.05)",color:"var(--text3)"}}>Tozalash</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:5}}>
         {Array.from({length:qCount},(_,i)=>i+1).map(n=>{
-          const val=answerKey[n]; const vc=val?LC[val]:null;
+          const val=answerKey[n];const vc=val?LC[val]:null;
           return (
-            <div key={n} style={{background:val?vc+"11":"rgba(255,255,255,.02)",borderRadius:8,padding:"7px 3px",
-              border:`1px solid ${val?vc+"33":"rgba(255,255,255,.05)"}`,textAlign:"center"}}>
+            <div key={n} style={{background:val?vc+"11":"rgba(255,255,255,.02)",borderRadius:8,padding:"7px 3px",border:`1px solid ${val?vc+"33":"rgba(255,255,255,.05)"}`,textAlign:"center"}}>
               <div style={{color:val?vc:"var(--text3)",fontSize:10,marginBottom:4,fontWeight:700}}>#{n}</div>
               <div style={{display:"flex",gap:2,justifyContent:"center"}}>
-                {LETTERS.map(l=>{const sel=val===l;const c=LC[l];return(
-                  <button key={l} onClick={()=>setAnswerKey(p=>({...p,[n]:l}))}
-                    style={{width:20,height:20,borderRadius:4,border:sel?`1px solid ${c}`:"none",fontWeight:800,fontSize:9,
-                      cursor:"pointer",background:sel?c:"rgba(255,255,255,.06)",color:sel?"#fff":"#475569",
-                      WebkitTapHighlightColor:"transparent"}}>{l}</button>
-                );})}
+                {LETTERS.map(l=>{const sel=val===l;const c=LC[l];return <button key={l} onClick={()=>setAnswerKey(p=>({...p,[n]:l}))} style={{width:20,height:20,borderRadius:4,border:sel?`1px solid ${c}`:"none",fontWeight:800,fontSize:9,cursor:"pointer",background:sel?c:"rgba(255,255,255,.06)",color:sel?"#fff":"#475569"}}>{l}</button>;})}
               </div>
             </div>
           );
@@ -345,116 +269,85 @@ const AnswerKeyGrid = ({answerKey,setAnswerKey,qCount}) => {
   );
 };
 
-// ═══════════════════════════════════════════════════
-// O'QITUVCHI PANELI
-// ═══════════════════════════════════════════════════
+// ── O'QITUVCHI PANELI ─────────────────────────────────────────
 const TeacherPanel = ({profile,onLogout}) => {
-  const [tab,setTab]       = useState("tests");
-  const [tests,setTests]   = useState([]);
-  const [results,setResults] = useState([]);
-  const [loading,setLoading] = useState(true);
-  const [syncing,setSyncing] = useState(false);
-  const [confirm,setConfirm] = useState(null);
+  const [tab,setTab]=useState("tests");
+  const [tests,setTests]=useState([]);
+  const [results,setResults]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [syncing,setSyncing]=useState(false);
+  const [confirm,setConfirm]=useState(null);
+  const [building,setBuilding]=useState(false);
+  const [title,setTitle]=useState("");
+  const [timeLimit,setTimeLimit]=useState(20);
+  const [qCount,setQCount]=useState(10);
+  const [answerKey,setAnswerKey]=useState({});
+  const [imgFiles,setImgFiles]=useState([]);
+  const [imgPreviews,setImgPreviews]=useState([]);
+  const [saving,setSaving]=useState(false);
+  const fileRef=useRef();
 
-  // Test yaratish state
-  const [building,setBuilding]     = useState(false);
-  const [title,setTitle]           = useState("");
-  const [timeLimit,setTimeLimit]   = useState(20);
-  const [qCount,setQCount]         = useState(10);
-  const [answerKey,setAnswerKey]   = useState({});
-  const [imageFile,setImageFile]   = useState(null);
-  const [imagePreview,setImagePreview] = useState("");
-  const [saving,setSaving]         = useState(false);
-
-  const fileRef = useRef();
-
-  const loadData = useCallback(async () => {
+  const loadData=useCallback(async()=>{
     setLoading(true);
-    const {data:t} = await sb.from("tests").select("*").eq("teacher_id",profile.id).order("created_at",{ascending:false});
-    const {data:r} = await sb.from("results").select("*,profiles(full_name,class_id,classes(name))").in("test_id",(t||[]).map(x=>x.id));
-    setTests(t||[]);
-    setResults(r||[]);
-    setLoading(false);
+    const {data:t}=await sb.from("tests").select("*").eq("teacher_id",profile.id).order("created_at",{ascending:false});
+    const ids=(t||[]).map(x=>x.id);
+    const {data:r}=ids.length?await sb.from("results").select("*,profiles(full_name)").in("test_id",ids):{data:[]};
+    setTests(t||[]);setResults(r||[]);setLoading(false);
   },[profile.id]);
 
   useEffect(()=>{loadData();},[loadData]);
 
-  const handleQCount = v => {
-    const n=Math.min(100,Math.max(1,v));
-    setQCount(n);
-    setAnswerKey(p=>{const next={};for(let i=1;i<=n;i++)if(p[i])next[i]=p[i];return next;});
+  const handleQCount=v=>{
+    const n=Math.min(100,Math.max(1,v));setQCount(n);
+    setAnswerKey(p=>{const nx={};for(let i=1;i<=n;i++)if(p[i])nx[i]=p[i];return nx;});
   };
 
-  const handleImagePick = e => {
-    const file = e.target.files?.[0];
-    if(!file) return;
-    if(file.size>3*1024*1024) return alert("Rasm 3MB dan kichik bo'lsin!");
-    setImageFile(file);
-    const reader=new FileReader();
-    reader.onload=ev=>setImagePreview(ev.target.result);
-    reader.readAsDataURL(file);
-  };
-
-  const handleSave = async () => {
-    if(!title.trim()) return alert("Test nomini kiriting!");
-    const missing=[];
-    for(let i=1;i<=qCount;i++) if(!answerKey[i]) missing.push(i);
-    if(missing.length) return alert(`Javobsiz savollar: ${missing.slice(0,10).join(", ")}${missing.length>10?"...":""}`);
-    setSaving(true);
-    let image_url = null;
-    // Rasm yuklash
-    if(imageFile) {
-      const ext  = imageFile.name.split(".").pop();
-      const path = `${profile.id}/${Date.now()}.${ext}`;
-      const {data,error} = await sb.storage.from("test-images").upload(path,imageFile);
-      if(!error) {
-        const {data:pub} = sb.storage.from("test-images").getPublicUrl(path);
-        image_url = pub.publicUrl;
-      }
-    }
-    const {error} = await sb.from("tests").insert({
-      title, teacher_id:profile.id, time_limit:timeLimit,
-      question_count:qCount, answer_key:answerKey, image_url, active:false
+  const handleImgPick=e=>{
+    const files=Array.from(e.target.files||[]);
+    files.slice(0,5-imgFiles.length).forEach(f=>{
+      if(f.size>5*1024*1024){alert(f.name+" — 5MB dan kichik bo'lsin!");return;}
+      const r=new FileReader();
+      r.onload=ev=>{setImgPreviews(p=>[...p,ev.target.result]);setImgFiles(p=>[...p,f]);};
+      r.readAsDataURL(f);
     });
+    e.target.value="";
+  };
+
+  const removeImg=i=>{setImgFiles(p=>p.filter((_,j)=>j!==i));setImgPreviews(p=>p.filter((_,j)=>j!==i));};
+
+  const handleSave=async()=>{
+    if(!title.trim()) return alert("Test nomini kiriting!");
+    const missing=[];for(let i=1;i<=qCount;i++)if(!answerKey[i])missing.push(i);
+    if(missing.length) return alert("Javobsiz savollar: "+missing.slice(0,10).join(", ")+(missing.length>10?"...":""));
+    setSaving(true);
+    const image_urls=[];
+    for(const file of imgFiles){
+      const ext=file.name.split(".").pop();
+      const path=`${profile.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const {error}=await sb.storage.from("test-images").upload(path,file);
+      if(!error){const {data:p}=sb.storage.from("test-images").getPublicUrl(path);image_urls.push(p.publicUrl);}
+    }
+    const {error}=await sb.from("tests").insert({title,teacher_id:profile.id,time_limit:timeLimit,question_count:qCount,answer_key:answerKey,image_urls:image_urls.length?image_urls:null,active:false});
     if(error) alert("Xato: "+error.message);
-    else { resetBuilder(); await loadData(); setTab("manage"); }
+    else{setTitle("");setTimeLimit(20);setQCount(10);setAnswerKey({});setImgFiles([]);setImgPreviews([]);setBuilding(false);await loadData();setTab("manage");}
     setSaving(false);
   };
 
-  const resetBuilder = () => {setTitle("");setTimeLimit(20);setQCount(10);setAnswerKey({});setImageFile(null);setImagePreview("");setBuilding(false);};
-
-  const toggleActive = async (test) => {
-    setSyncing(true);
-    await sb.from("tests").update({active:!test.active}).eq("id",test.id);
-    await loadData();
-    setSyncing(false);
-  };
-
-  const deleteTest = async (id) => {
-    await sb.from("tests").delete().eq("id",id);
-    setConfirm(null);
-    await loadData();
-  };
+  const toggleActive=async t=>{setSyncing(true);await sb.from("tests").update({active:!t.active}).eq("id",t.id);await loadData();setSyncing(false);};
+  const deleteTest=async id=>{await sb.from("tests").delete().eq("id",id);setConfirm(null);await loadData();};
+  const grantRetry=async id=>{await sb.from("results").update({can_retry:true}).eq("id",id);await loadData();};
 
   const TABS=[{id:"tests",icon:"📝",label:"Testlar"},{id:"manage",icon:"⚙️",label:"Boshqarish"},{id:"results",icon:"📊",label:"Natijalar"}];
-
   if(loading) return <LoadingPage/>;
 
   return (
     <div style={{minHeight:"100vh",background:"var(--bg)",paddingBottom:72}}>
-      {confirm && <ConfirmModal message={`"${confirm.title}" testini o'chirasizmi?\nBarcha natijalar ham o'chadi!`}
-        onConfirm={()=>deleteTest(confirm.id)} onCancel={()=>setConfirm(null)}/>}
-
-      {syncing && <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,height:3,
-        background:"linear-gradient(90deg,var(--blue),var(--purple),var(--blue))",
-        backgroundSize:"200% 100%",animation:"shimmer 1.5s infinite"}}/>}
-
-      {/* Header */}
-      <div style={{background:"rgba(255,255,255,.02)",borderBottom:"1px solid var(--border)",
-        padding:"0 16px",height:52,position:"sticky",top:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      {confirm&&<ConfirmModal message={`"${confirm.title}" testini o'chirasizmi?\nBarcha natijalar ham o'chadi!`} onConfirm={()=>deleteTest(confirm.id)} onCancel={()=>setConfirm(null)}/>}
+      {syncing&&<div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,height:3,background:"linear-gradient(90deg,var(--blue),var(--purple),var(--blue))",backgroundSize:"200% 100%",animation:"shimmer 1.5s infinite"}}/>}
+      <div style={{background:"rgba(255,255,255,.02)",borderBottom:"1px solid var(--border)",padding:"0 16px",height:52,position:"sticky",top:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:20}}>🎓</span>
-          <span style={{fontWeight:800,fontSize:16,color:"var(--text)",letterSpacing:-.5}}>Testlyy</span>
+          <span style={{fontWeight:800,fontSize:16,color:"var(--text)"}}>Testlyy</span>
           <Badge color="var(--blue)">O'qituvchi</Badge>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -462,41 +355,29 @@ const TeacherPanel = ({profile,onLogout}) => {
           <Btn onClick={onLogout} variant="ghost" size="sm">↩ Chiqish</Btn>
         </div>
       </div>
-
-      {/* Bottom tabs */}
-      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,
-        background:"rgba(10,15,30,.98)",backdropFilter:"blur(20px)",
-        borderTop:"1px solid var(--border)",display:"flex",height:62}}>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"rgba(10,15,30,.98)",backdropFilter:"blur(20px)",borderTop:"1px solid var(--border)",display:"flex",height:62}}>
         {TABS.map(t=>{const act=tab===t.id;return(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{
-            flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-            gap:3,border:"none",cursor:"pointer",background:"transparent",
-            WebkitTapHighlightColor:"transparent",color:act?"var(--blue)":"var(--text3)",position:"relative",transition:"color .2s"}}>
-            {act && <div style={{position:"absolute",top:0,left:"25%",right:"25%",height:2,background:"var(--blue)",borderRadius:"0 0 3px 3px"}}/>}
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,border:"none",cursor:"pointer",background:"transparent",WebkitTapHighlightColor:"transparent",color:act?"var(--blue)":"var(--text3)",position:"relative",transition:"color .2s"}}>
+            {act&&<div style={{position:"absolute",top:0,left:"25%",right:"25%",height:2,background:"var(--blue)",borderRadius:"0 0 3px 3px"}}/>}
             <span style={{fontSize:20,lineHeight:1}}>{t.icon}</span>
             <span style={{fontSize:11,fontWeight:act?700:400}}>{t.label}</span>
           </button>
         );})}
       </div>
-
       <div style={{maxWidth:960,margin:"0 auto",padding:"16px 14px 24px"}}>
 
-        {/* ─── TESTLAR TAB ─── */}
-        {tab==="tests" && (
+        {tab==="tests"&&(
           <div className="fade">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
               <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)"}}>Testlar</h2>
-              {!building && <Btn onClick={()=>setBuilding(true)} variant="success">+ Yangi test</Btn>}
+              {!building&&<Btn onClick={()=>setBuilding(true)} variant="success">+ Yangi test</Btn>}
             </div>
-
-            {building && (
+            {building&&(
               <Card style={{marginBottom:20}}>
-                <h3 style={{color:"var(--text)",fontWeight:700,fontSize:17,marginBottom:20}}>📋 Yangi test yaratish</h3>
-                <Input label="Test nomi" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Masalan: Matematika 9-A variant-1"/>
-
-                {/* Vaqt va savollar */}
+                <h3 style={{color:"var(--text)",fontWeight:700,fontSize:17,marginBottom:20}}>📋 Yangi test</h3>
+                <Input label="Test nomi" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Matematika 9-A variant-1"/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
-                  {[{lbl:"⏱ Vaqt (daqiqa)",val:timeLimit,min:5,max:120,step:5,set:v=>setTimeLimit(v)},
+                  {[{lbl:"⏱ Vaqt (daqiqa)",val:timeLimit,min:5,max:180,step:5,set:v=>setTimeLimit(v)},
                     {lbl:"📋 Savollar soni",val:qCount,min:1,max:100,step:1,set:handleQCount}].map(f=>(
                     <div key={f.lbl} style={{background:"rgba(255,255,255,.03)",borderRadius:12,padding:"12px"}}>
                       <label style={{display:"block",fontSize:11,color:"var(--text2)",marginBottom:8,fontWeight:700,textTransform:"uppercase"}}>{f.lbl}</label>
@@ -508,84 +389,70 @@ const TeacherPanel = ({profile,onLogout}) => {
                     </div>
                   ))}
                 </div>
-
-                {/* Rasm yuklash */}
                 <div style={{marginBottom:16}}>
-                  <label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:8,fontWeight:700,textTransform:"uppercase"}}>🖼 Test rasmi (ixtiyoriy)</label>
-                  <input ref={fileRef} type="file" accept="image/*" onChange={handleImagePick} style={{display:"none"}}/>
-                  {imagePreview ? (
-                    <div style={{position:"relative"}}>
-                      <img src={imagePreview} style={{width:"100%",maxHeight:200,objectFit:"contain",borderRadius:10,background:"var(--bg3)",border:"1px solid var(--border)"}}/>
-                      <button onClick={()=>{setImageFile(null);setImagePreview("");}} style={{
-                        position:"absolute",top:8,right:8,width:28,height:28,borderRadius:"50%",
-                        background:"var(--red)",border:"none",color:"#fff",fontSize:14,cursor:"pointer"}}>×</button>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <label style={{fontSize:12,color:"var(--text2)",fontWeight:700,textTransform:"uppercase"}}>🖼 Rasmlar (max 5 ta)</label>
+                    <span style={{fontSize:12,color:imgFiles.length>=5?"var(--red)":"var(--text3)"}}>{imgFiles.length}/5</span>
+                  </div>
+                  <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleImgPick} style={{display:"none"}}/>
+                  {imgPreviews.length>0&&(
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+                      {imgPreviews.map((src,i)=>(
+                        <div key={i} style={{position:"relative",width:80,height:80}}>
+                          <img src={src} style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:"1px solid var(--border2)"}}/>
+                          <button onClick={()=>removeImg(i)} style={{position:"absolute",top:-6,right:-6,width:22,height:22,borderRadius:"50%",background:"var(--red)",border:"none",color:"#fff",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+                        </div>
+                      ))}
                     </div>
-                  ) : (
-                    <div onClick={()=>fileRef.current?.click()} style={{
-                      border:"2px dashed var(--border2)",borderRadius:10,padding:"20px",textAlign:"center",cursor:"pointer",
-                      background:"rgba(255,255,255,.02)",transition:"border-color .2s"}}
-                      onMouseEnter={e=>e.currentTarget.style.borderColor="var(--blue)"}
-                      onMouseLeave={e=>e.currentTarget.style.borderColor="var(--border2)"}>
-                      <div style={{fontSize:28,marginBottom:6}}>📷</div>
-                      <p style={{color:"var(--text3)",fontSize:13}}>Rasm tanlash uchun bosing</p>
-                      <p style={{color:"var(--text3)",fontSize:11,marginTop:4}}>PNG, JPG — 3MB gacha</p>
+                  )}
+                  {imgFiles.length<5&&(
+                    <div onClick={()=>fileRef.current?.click()} style={{border:"2px dashed var(--border2)",borderRadius:10,padding:"16px",textAlign:"center",cursor:"pointer",background:"rgba(255,255,255,.02)"}}>
+                      <div style={{fontSize:24,marginBottom:4}}>📷</div>
+                      <p style={{color:"var(--text3)",fontSize:13}}>Rasm qo'shish (PNG/JPG, 5MB gacha)</p>
                     </div>
                   )}
                 </div>
-
-                {/* Javoblar kaliti */}
                 <div style={{background:"rgba(0,0,0,.2)",borderRadius:12,padding:14,marginBottom:20,border:"1px solid rgba(255,255,255,.05)"}}>
                   <AnswerKeyGrid answerKey={answerKey} setAnswerKey={setAnswerKey} qCount={qCount}/>
                 </div>
-
-                <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                  <Btn onClick={handleSave} variant="success" disabled={saving}>
-                    {saving?<Spinner size={16} color="#fff"/>:"💾 Saqlash"}
-                  </Btn>
-                  <Btn onClick={resetBuilder} variant="ghost">Bekor qilish</Btn>
+                <div style={{display:"flex",gap:10}}>
+                  <Btn onClick={handleSave} variant="success" disabled={saving}>{saving?<Spinner size={16} color="#fff"/>:"💾 Saqlash"}</Btn>
+                  <Btn onClick={()=>{setTitle("");setTimeLimit(20);setQCount(10);setAnswerKey({});setImgFiles([]);setImgPreviews([]);setBuilding(false);}} variant="ghost">Bekor</Btn>
                 </div>
               </Card>
             )}
-
-            {tests.length===0 && !building && (
-              <Card style={{textAlign:"center",padding:48}}>
-                <div style={{fontSize:48,marginBottom:12}}>📋</div>
-                <p style={{color:"var(--text3)"}}>Hali test yaratilmagan</p>
-              </Card>
-            )}
-
-            {tests.map(t=>(
-              <Card key={t.id} style={{marginBottom:10}}>
-                <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:10}}>
-                  {t.image_url && <img src={t.image_url} style={{width:52,height:52,objectFit:"cover",borderRadius:8,flexShrink:0,border:"1px solid var(--border)"}}/>}
-                  <div style={{minWidth:0,flex:1}}>
-                    <div style={{color:"var(--text)",fontWeight:700,fontSize:14,marginBottom:5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                      <Badge color={t.active?"var(--green)":"var(--text3)"}>{t.active?"Faol":"Nofaol"}</Badge>
-                      <span style={{color:"var(--text3)",fontSize:12}}>{t.question_count} savol · {t.time_limit} min</span>
+            {!tests.length&&!building&&<Card style={{textAlign:"center",padding:48}}><div style={{fontSize:48,marginBottom:12}}>📋</div><p style={{color:"var(--text3)"}}>Hali test yaratilmagan</p></Card>}
+            {tests.map(t=>{
+              const imgs=t.image_urls||[];
+              return (
+                <Card key={t.id} style={{marginBottom:10}}>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:10}}>
+                    {imgs[0]&&<img src={imgs[0]} style={{width:52,height:52,objectFit:"cover",borderRadius:8,flexShrink:0,border:"1px solid var(--border)"}}/>}
+                    <div style={{minWidth:0,flex:1}}>
+                      <div style={{color:"var(--text)",fontWeight:700,fontSize:14,marginBottom:5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                        <Badge color={t.active?"var(--green)":"var(--text3)"}>{t.active?"Faol":"Nofaol"}</Badge>
+                        <span style={{color:"var(--text3)",fontSize:12}}>{t.question_count} savol · {t.time_limit} min</span>
+                        {imgs.length>1&&<span style={{color:"var(--yellow)",fontSize:12}}>🖼 {imgs.length} rasm</span>}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>toggleActive(t)} style={{flex:1,padding:"9px 8px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,
-                    background:t.active?"linear-gradient(135deg,#f59e0b,#d97706)":"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",WebkitTapHighlightColor:"transparent"}}>
-                    {t.active?"⏸ To'xtatish":"▶ Faollashtirish"}
-                  </button>
-                  <button onClick={()=>setConfirm({id:t.id,title:t.title})} style={{padding:"9px 14px",borderRadius:10,border:"none",cursor:"pointer",
-                    background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",WebkitTapHighlightColor:"transparent"}}>🗑</button>
-                </div>
-              </Card>
-            ))}
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>toggleActive(t)} style={{flex:1,padding:"9px 8px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,color:"#fff",WebkitTapHighlightColor:"transparent",background:t.active?"linear-gradient(135deg,#f59e0b,#d97706)":"linear-gradient(135deg,#22c55e,#16a34a)"}}>{t.active?"⏸ To'xtatish":"▶ Faollashtirish"}</button>
+                    <button onClick={()=>setConfirm({id:t.id,title:t.title})} style={{padding:"9px 14px",borderRadius:10,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff"}}>🗑</button>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
 
-        {/* ─── BOSHQARISH TAB ─── */}
-        {tab==="manage" && (
+        {tab==="manage"&&(
           <div className="fade">
             <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:20}}>Test boshqarish</h2>
-            {tests.length===0 && <Card style={{textAlign:"center",padding:48}}><p style={{color:"var(--text3)"}}>Avval test yarating</p></Card>}
+            {!tests.length&&<Card style={{textAlign:"center",padding:48}}><p style={{color:"var(--text3)"}}>Avval test yarating</p></Card>}
             {tests.map(test=>{
-              const testResults = results.filter(r=>r.test_id===test.id);
+              const testResults=results.filter(r=>r.test_id===test.id);
               return (
                 <Card key={test.id} style={{marginBottom:16}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:12}}>
@@ -596,61 +463,48 @@ const TeacherPanel = ({profile,onLogout}) => {
                         <span style={{color:"var(--text3)",fontSize:12}}>{test.question_count} savol</span>
                       </div>
                     </div>
-                    <Badge color="var(--blue)">{testResults.length} ta</Badge>
+                    <Badge color="var(--blue)">{testResults.length} natija</Badge>
                   </div>
-                  {testResults.length===0
-                    ? <p style={{color:"var(--text3)",fontSize:13}}>Hali hech kim topshirmagan</p>
-                    : testResults.map(r=>{
-                        const name = r.profiles?.full_name || "Noma'lum";
-                        const g = getGrade(r.score,r.total);
-                        const isFirst = r.attempt_number===1;
-                        const hasSecond = testResults.some(x=>x.student_id===r.student_id&&x.attempt_number===2);
-                        return (
-                          <div key={r.id} style={{background:"rgba(255,255,255,.03)",borderRadius:10,padding:"10px 12px",marginBottom:6,
-                            display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                            <div>
-                              <span style={{color:"var(--text)",fontWeight:600,fontSize:14}}>{name}</span>
-                              <span style={{color:"var(--text3)",fontSize:12,marginLeft:8}}>{r.attempt_number}-urinish</span>
-                            </div>
-                            <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                              <span style={{background:gradeColor(g)+"22",color:gradeColor(g),border:`1px solid ${gradeColor(g)}44`,borderRadius:8,padding:"2px 10px",fontWeight:800}}>{g}</span>
-                              <span style={{color:"var(--text2)",fontSize:13}}>{r.score}/{r.total}</span>
-                              {isFirst && !hasSecond && (
-                                <Btn size="sm" variant="warning" onClick={async()=>{
-                                  await sb.from("results").update({attempt_number:1}).eq("id",r.id);
-                                  await loadData();
-                                }}>🔓 2-imkoniyat</Btn>
-                              )}
-                            </div>
-                          </div>
-                        );
-                    })}
+                  {!testResults.length?<p style={{color:"var(--text3)",fontSize:13}}>Hali hech kim topshirmagan</p>
+                  :testResults.map(r=>{
+                    const g=getGrade(r.score,r.total);
+                    const has2=testResults.some(x=>x.student_id===r.student_id&&x.attempt_number===2);
+                    return (
+                      <div key={r.id} style={{background:"rgba(255,255,255,.03)",borderRadius:10,padding:"10px 12px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                        <div>
+                          <span style={{color:"var(--text)",fontWeight:600,fontSize:14}}>{r.profiles?.full_name||"Noma'lum"}</span>
+                          <span style={{color:"var(--text3)",fontSize:12,marginLeft:8}}>{r.attempt_number}-urinish</span>
+                        </div>
+                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                          <span style={{background:gradeColor(g)+"22",color:gradeColor(g),border:`1px solid ${gradeColor(g)}44`,borderRadius:8,padding:"2px 10px",fontWeight:800}}>{g}</span>
+                          <span style={{color:"var(--text2)",fontSize:13}}>{r.score}/{r.total}</span>
+                          {r.attempt_number===1&&!has2&&!r.can_retry&&<Btn size="sm" variant="warning" onClick={()=>grantRetry(r.id)}>🔓 2-imkoniyat</Btn>}
+                          {r.can_retry&&!has2&&<Badge color="var(--yellow)">⏳ Kutilmoqda</Badge>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </Card>
               );
             })}
           </div>
         )}
 
-        {/* ─── NATIJALAR TAB ─── */}
-        {tab==="results" && (
+        {tab==="results"&&(
           <div className="fade">
             <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:20}}>Natijalar</h2>
             {tests.map(test=>{
-              const rows = results.filter(r=>r.test_id===test.id);
+              const rows=results.filter(r=>r.test_id===test.id);
               if(!rows.length) return null;
               return (
                 <Card key={test.id} style={{marginBottom:20}}>
                   <h3 style={{color:"var(--text)",fontWeight:700,marginBottom:4}}>{test.title}</h3>
                   <p style={{color:"var(--text3)",fontSize:13,marginBottom:16}}>{rows.length} ta natija</p>
-                  <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                  <div style={{overflowX:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",minWidth:440}}>
-                      <thead>
-                        <tr style={{borderBottom:"1px solid var(--border)"}}>
-                          {["#","Ism","To'g'ri","Foiz","Baho","Vaqt"].map(h=>(
-                            <th key={h} style={{padding:"10px 10px",color:"var(--text3)",fontSize:12,fontWeight:600,textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
+                      <thead><tr style={{borderBottom:"1px solid var(--border)"}}>
+                        {["#","Ism","To'g'ri","Foiz","Baho","Urinish","Vaqt"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--text3)",fontSize:12,fontWeight:600,textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}
+                      </tr></thead>
                       <tbody>
                         {rows.sort((a,b)=>b.score-a.score).map((r,i)=>{
                           const g=getGrade(r.score,r.total);
@@ -661,6 +515,7 @@ const TeacherPanel = ({profile,onLogout}) => {
                               <td style={{padding:"10px 10px",color:"var(--green)",fontWeight:700}}>{r.score}/{r.total}</td>
                               <td style={{padding:"10px 10px",color:"var(--blue)",fontWeight:600}}>{r.percent}%</td>
                               <td style={{padding:"10px 10px"}}><span style={{background:gradeColor(g)+"22",color:gradeColor(g),border:`1px solid ${gradeColor(g)}44`,borderRadius:8,padding:"2px 10px",fontWeight:800}}>{g}</span></td>
+                              <td style={{padding:"10px 10px",color:"var(--text3)",fontSize:12}}>{r.attempt_number}</td>
                               <td style={{padding:"10px 10px",color:"var(--text2)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{fmt(r.time_taken)}</td>
                             </tr>
                           );
@@ -671,12 +526,7 @@ const TeacherPanel = ({profile,onLogout}) => {
                 </Card>
               );
             })}
-            {tests.every(t=>!results.some(r=>r.test_id===t.id)) && (
-              <Card style={{textAlign:"center",padding:48}}>
-                <div style={{fontSize:48,marginBottom:12}}>📊</div>
-                <p style={{color:"var(--text3)"}}>Hali natijalar yo'q</p>
-              </Card>
-            )}
+            {tests.every(t=>!results.some(r=>r.test_id===t.id))&&<Card style={{textAlign:"center",padding:48}}><div style={{fontSize:48,marginBottom:12}}>📊</div><p style={{color:"var(--text3)"}}>Hali natijalar yo'q</p></Card>}
           </div>
         )}
       </div>
@@ -684,82 +534,63 @@ const TeacherPanel = ({profile,onLogout}) => {
   );
 };
 
-// ═══════════════════════════════════════════════════
-// O'QUVCHI PANELI — TEST TANLASH
-// ═══════════════════════════════════════════════════
+// ── O'QUVCHI ENTRY ───────────────────────────────────────────
 const StudentEntry = ({profile,onStart,onLogout}) => {
-  const [tests,setTests]   = useState([]);
-  const [selId,setSelId]   = useState("");
-  const [loading,setLoading] = useState(true);
-  const [err,setErr]       = useState("");
-  const [myResults,setMyResults] = useState([]);
+  const [tests,setTests]=useState([]);
+  const [myResults,setMyRes]=useState([]);
+  const [selId,setSelId]=useState("");
+  const [loading,setLoading]=useState(true);
+  const [err,setErr]=useState("");
 
   useEffect(()=>{
-    const load = async () => {
-      const {data:t} = await sb.from("tests").select("*").eq("active",true).order("created_at",{ascending:false});
-      const {data:r} = await sb.from("results").select("*").eq("student_id",profile.id);
-      setTests(t||[]);
-      setMyResults(r||[]);
-      setLoading(false);
+    const load=async()=>{
+      const {data:t}=await sb.from("tests").select("*").eq("active",true).order("created_at",{ascending:false});
+      const {data:r}=await sb.from("results").select("*").eq("student_id",profile.id);
+      setTests(t||[]);setMyRes(r||[]);setLoading(false);
     };
     load();
   },[profile.id]);
 
-  const go = () => {
+  const go=()=>{
     setErr("");
     if(!selId) return setErr("Test tanlang!");
-    const test = tests.find(t=>t.id===selId);
+    const test=tests.find(t=>t.id===selId);
     if(!test) return setErr("Test topilmadi!");
-    const done = myResults.filter(r=>r.test_id===test.id);
-    if(done.length>=2) return setErr("Siz bu testni 2 marta ishladingiz. O'qituvchidan ruxsat oling.");
-    if(done.length===1 && !done[0].can_retry) return setErr("Ikkinchi urinish uchun o'qituvchidan ruxsat oling!");
-    onStart({test, attemptNumber: done.length+1});
+    const done=myResults.filter(r=>r.test_id===test.id);
+    if(done.length>=2) return setErr("Siz bu testni 2 marta ishladingiz!");
+    if(done.length===1&&!done[0].can_retry) return setErr("2-urinish uchun o'qituvchingizdan ruxsat oling!");
+    onStart({test,attemptNumber:done.length+1});
   };
 
   if(loading) return <LoadingPage text="Testlar yuklanmoqda..."/>;
-
   return (
-    <div className="fade" style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,
-      background:"radial-gradient(ellipse at 20% 80%,rgba(34,197,94,.08) 0%,transparent 50%),var(--bg)"}}>
+    <div className="fade" style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"radial-gradient(ellipse at 20% 80%,rgba(34,197,94,.08) 0%,transparent 50%),var(--bg)"}}>
       <Card style={{width:"100%",maxWidth:440,padding:28}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-          <div>
-            <div style={{fontSize:24,marginBottom:4}}>👨‍🎓</div>
-            <h2 style={{fontSize:18,fontWeight:800,color:"var(--text)"}}>Salom, {profile.full_name.split(" ")[0]}!</h2>
-          </div>
+          <div><div style={{fontSize:24,marginBottom:4}}>👨‍🎓</div><h2 style={{fontSize:18,fontWeight:800,color:"var(--text)"}}>Salom, {profile.full_name.split(" ")[0]}!</h2></div>
           <Btn onClick={onLogout} variant="ghost" size="sm">↩ Chiqish</Btn>
         </div>
-
         <div style={{marginBottom:16}}>
-          <label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:8,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Test tanlang</label>
-          <select value={selId} onChange={e=>setSelId(e.target.value)} style={{
-            width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",
-            border:"1px solid var(--border2)",borderRadius:10,color:"var(--text)",fontSize:15,outline:"none",
-            WebkitAppearance:"none",appearance:"none"}}>
+          <label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:8,fontWeight:700,textTransform:"uppercase"}}>Test tanlang</label>
+          <select value={selId} onChange={e=>setSelId(e.target.value)} style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",border:"1px solid var(--border2)",borderRadius:10,color:"var(--text)",fontSize:15,outline:"none"}}>
             <option value="">-- Test tanlang --</option>
             {tests.map(t=>{
-              const done = myResults.filter(r=>r.test_id===t.id).length;
-              return <option key={t.id} value={t.id} style={{background:"#1e293b"}}>
-                {t.title} ({t.question_count} savol, {t.time_limit} min) {done>0?`[${done}/2]`:""}
-              </option>;
+              const done=myResults.filter(r=>r.test_id===t.id);
+              const blocked=done.length===1&&!done[0].can_retry;
+              return <option key={t.id} value={t.id} style={{background:"#1e293b"}}>{blocked?"🔒":"✅"} {t.title} ({t.question_count} savol){done.length>0?` [${done.length}/2]`:""}</option>;
             })}
           </select>
-          {tests.length===0 && <p style={{color:"var(--yellow)",fontSize:12,marginTop:6}}>⚠ Hozircha faol test yo'q</p>}
+          {!tests.length&&<p style={{color:"var(--yellow)",fontSize:12,marginTop:6}}>⚠ Hozircha faol test yo'q</p>}
         </div>
-
-        {err && <Alert type="error">{err}</Alert>}
+        {err&&<Alert type="error">{err}</Alert>}
         <Btn onClick={go} variant="success" full size="lg">Testni boshlash ▶</Btn>
-
-        {/* O'z natijalari */}
-        {myResults.length>0 && (
+        {myResults.length>0&&(
           <div style={{marginTop:20}}>
             <p style={{color:"var(--text2)",fontSize:12,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Mening natijalarim</p>
             {myResults.slice().reverse().map(r=>{
-              const g=getGrade(r.score,r.total);
-              const t=tests.find(x=>x.id===r.test_id);
+              const g=getGrade(r.score,r.total);const t=tests.find(x=>x.id===r.test_id);
               return (
-                <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                  background:"rgba(255,255,255,.03)",borderRadius:10,padding:"10px 12px",marginBottom:6}}>
+                <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,.03)",borderRadius:10,padding:"10px 12px",marginBottom:6}}>
                   <div>
                     <div style={{color:"var(--text)",fontSize:13,fontWeight:600}}>{t?.title||"Test"}</div>
                     <div style={{color:"var(--text3)",fontSize:11}}>{r.attempt_number}-urinish</div>
@@ -778,184 +609,107 @@ const StudentEntry = ({profile,onStart,onLogout}) => {
   );
 };
 
-// ═══════════════════════════════════════════════════
-// TEST SAHIFASI
-// ═══════════════════════════════════════════════════
+// ── TEST SAHIFASI ─────────────────────────────────────────────
 const TestPage = ({profile,test,attemptNumber,onFinish}) => {
-  const [answers,setAnswers]   = useState({});
-  const [currentQ,setCurrentQ] = useState(1);
-  const [timeLeft,setTimeLeft] = useState(test.time_limit*60);
-  const [showConfirm,setShowConfirm] = useState(false);
-  const [isMobile,setIsMobile] = useState(window.innerWidth<768);
+  const [answers,setAnswers]=useState({});
+  const [currentQ,setCurrentQ]=useState(1);
+  const [timeLeft,setTimeLeft]=useState(test.time_limit*60);
+  const [showConfirm,setShowConfirm]=useState(false);
+  const [isMobile,setIsMobile]=useState(window.innerWidth<768);
+  const answersRef=useRef({});
+  const finishedRef=useRef(false);
+  const startRef=useRef(Date.now());
 
-  const answersRef  = useRef({});
-  const finishedRef = useRef(false);
-  const startRef    = useRef(Date.now());
-  const timerRef    = useRef(null);
+  useEffect(()=>{const c=()=>setIsMobile(window.innerWidth<768);window.addEventListener("resize",c);return()=>window.removeEventListener("resize",c);},[]);
+  const pick=(q,l)=>{const n={...answersRef.current,[q]:l};answersRef.current=n;setAnswers({...n});};
 
-  useEffect(()=>{
-    const check = ()=>setIsMobile(window.innerWidth<768);
-    window.addEventListener("resize",check);
-    return ()=>window.removeEventListener("resize",check);
-  },[]);
-
-  const pick = (qNum,letter) => {
-    const next={...answersRef.current,[qNum]:letter};
-    answersRef.current=next; setAnswers({...next});
-  };
-
-  const calcFinish = useCallback(()=>{
-    if(finishedRef.current) return;
-    finishedRef.current=true;
-    if(timerRef.current) clearInterval(timerRef.current);
-    const timeTaken = Math.floor((Date.now()-startRef.current)/1000);
-    const ans = answersRef.current;
-    let score=0;
-    for(let i=1;i<=test.question_count;i++)
-      if(ans[i]&&test.answer_key[i]&&ans[i]===test.answer_key[i]) score++;
+  const doFinish=useCallback(()=>{
+    if(finishedRef.current) return;finishedRef.current=true;
+    const timeTaken=Math.floor((Date.now()-startRef.current)/1000);
+    const ans=answersRef.current;let score=0;
+    for(let i=1;i<=test.question_count;i++)if(ans[i]&&test.answer_key[i]&&ans[i]===test.answer_key[i])score++;
     onFinish({answers:{...ans},score,timeTaken,attemptNumber});
   },[test,onFinish,attemptNumber]);
 
   useEffect(()=>{
-    timerRef.current=setInterval(()=>{
-      setTimeLeft(prev=>{
-        if(prev<=1){clearInterval(timerRef.current);setTimeout(calcFinish,100);return 0;}
-        return prev-1;
-      });
-    },1000);
-    return()=>clearInterval(timerRef.current);
-  },[calcFinish]);
+    const t=setInterval(()=>setTimeLeft(p=>{if(p<=1){clearInterval(t);setTimeout(doFinish,100);return 0;}return p-1;}),1000);
+    return()=>clearInterval(t);
+  },[doFinish]);
 
-  const urgent = timeLeft<=60;
-  const pct    = (timeLeft/(test.time_limit*60))*100;
-  const answeredCount = Object.keys(answers).length;
+  const urgent=timeLeft<=60;
+  const imgs=test.image_urls||[];
+  const answered=Object.keys(answers).length;
 
-  const QuestionNavigator = () => (
+  const QuestionNav=()=>(
     <Card style={{padding:14,marginBottom:14}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <p style={{fontSize:11,color:"var(--text2)",fontWeight:700,textTransform:"uppercase"}}>Savollar</p>
-        <span style={{fontSize:12,color:answeredCount===test.question_count?"var(--green)":"var(--yellow)",fontWeight:700}}>
-          {answeredCount}/{test.question_count} {answeredCount===test.question_count?"✅":""}
-        </span>
+        <span style={{fontSize:12,color:answered===test.question_count?"var(--green)":"var(--yellow)",fontWeight:700}}>{answered}/{test.question_count}{answered===test.question_count?" ✅":""}</span>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
         {Array.from({length:test.question_count},(_,i)=>i+1).map(n=>{
-          const ans=answers[n]; const cur=n===currentQ;
-          return (
-            <button key={n} onClick={()=>setCurrentQ(n)} style={{
-              width:32,height:32,borderRadius:7,
-              border:cur?"2px solid var(--blue)":"1px solid rgba(255,255,255,.1)",
-              cursor:"pointer",fontWeight:700,fontSize:11,transition:"all .12s",
-              background:cur?"var(--blue)":ans?LC[ans]+"22":"rgba(255,255,255,.04)",
-              color:cur?"#fff":ans?LC[ans]:"var(--text3)",WebkitTapHighlightColor:"transparent"}}>
-              {ans||n}
-            </button>
-          );
+          const a=answers[n];const cur=n===currentQ;
+          return <button key={n} onClick={()=>setCurrentQ(n)} style={{width:32,height:32,borderRadius:7,border:cur?"2px solid var(--blue)":"1px solid rgba(255,255,255,.1)",cursor:"pointer",fontWeight:700,fontSize:11,transition:"all .12s",background:cur?"var(--blue)":a?LC[a]+"22":"rgba(255,255,255,.04)",color:cur?"#fff":a?LC[a]:"var(--text3)",WebkitTapHighlightColor:"transparent"}}>{a||n}</button>;
         })}
       </div>
     </Card>
   );
 
-  const AnswerCard = () => (
+  const AnswerCard=()=>(
     <Card style={{padding:20,marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
-        <div style={{width:44,height:44,borderRadius:12,background:"linear-gradient(135deg,var(--blue),var(--purple))",
-          display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:18,flexShrink:0}}>{currentQ}</div>
-        <div>
-          <p style={{color:"var(--text)",fontWeight:700,fontSize:16}}>{currentQ}-savol javobi</p>
-          <p style={{color:"var(--text3)",fontSize:12}}>To'g'ri javob harfini tanlang</p>
-        </div>
+        <div style={{width:44,height:44,borderRadius:12,background:"linear-gradient(135deg,var(--blue),var(--purple))",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:18,flexShrink:0}}>{currentQ}</div>
+        <div><p style={{color:"var(--text)",fontWeight:700,fontSize:16}}>{currentQ}-savol javobi</p><p style={{color:"var(--text3)",fontSize:12}}>To'g'ri javob harfini tanlang</p></div>
       </div>
       <AnswerPicker size="lg" value={answers[currentQ]||null} onChange={l=>pick(currentQ,l)}/>
-      {answers[currentQ] && (
-        <div style={{marginTop:14,padding:"10px 14px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.2)",borderRadius:10}}>
-          <span style={{color:"var(--green)",fontSize:14,fontWeight:600}}>✓ {currentQ}-savol: <strong>{answers[currentQ]}</strong></span>
-        </div>
-      )}
+      {answers[currentQ]&&<div style={{marginTop:14,padding:"10px 14px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.2)",borderRadius:10}}><span style={{color:"var(--green)",fontSize:14,fontWeight:600}}>✓ {currentQ}-savol: <strong>{answers[currentQ]}</strong></span></div>}
     </Card>
   );
 
-  const NavBtns = () => (
+  const NavBtns=()=>(
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
       <Btn onClick={()=>setCurrentQ(n=>Math.max(1,n-1))} variant="ghost" disabled={currentQ===1} size="sm">← Oldingi</Btn>
       <span style={{color:"var(--text3)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{currentQ}/{test.question_count}</span>
-      {currentQ<test.question_count
-        ? <Btn onClick={()=>setCurrentQ(n=>n+1)} variant="primary" size="sm">Keyingi →</Btn>
-        : <Btn onClick={()=>setShowConfirm(true)} variant="success" size="sm">✅ Tugatish</Btn>}
+      {currentQ<test.question_count?<Btn onClick={()=>setCurrentQ(n=>n+1)} variant="primary" size="sm">Keyingi →</Btn>:<Btn onClick={()=>setShowConfirm(true)} variant="success" size="sm">✅ Tugatish</Btn>}
     </div>
   );
 
   return (
     <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",flexDirection:"column"}}>
-      {showConfirm && <ConfirmModal
-        message={`${test.question_count-answeredCount>0?`⚠ ${test.question_count-answeredCount} ta savol javobsiz!\n\n`:"Barcha savollarga javob berdiniz.\n\n"}Testni tugatmoqchimisiz?`}
-        confirmText="Ha, tugatish" danger={false}
-        onConfirm={()=>{setShowConfirm(false);calcFinish();}} onCancel={()=>setShowConfirm(false)}/>}
-
-      {/* Sticky header */}
-      <div style={{background:"rgba(10,15,30,.97)",backdropFilter:"blur(12px)",borderBottom:"1px solid var(--border)",
-        padding:"0 12px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,
-        position:"sticky",top:0,zIndex:100,gap:8}}>
+      {showConfirm&&<ConfirmModal message={`${test.question_count-answered>0?"⚠ "+( test.question_count-answered)+" ta savol javobsiz!\n\n":""}Testni tugatmoqchimisiz?`} confirmText="Ha, tugatish" danger={false} onConfirm={()=>{setShowConfirm(false);doFinish();}} onCancel={()=>setShowConfirm(false)}/>}
+      <div style={{background:"rgba(10,15,30,.97)",backdropFilter:"blur(12px)",borderBottom:"1px solid var(--border)",padding:"0 12px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,position:"sticky",top:0,zIndex:100,gap:8}}>
         <div style={{minWidth:0}}>
           <div style={{color:"var(--text)",fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{test.title}</div>
           <div style={{color:"var(--text3)",fontSize:11}}>{profile.full_name}</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-          <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",
-            background:urgent?"rgba(239,68,68,.12)":"rgba(59,130,246,.1)",
-            border:`1px solid ${urgent?"rgba(239,68,68,.35)":"rgba(59,130,246,.3)"}`,
-            borderRadius:10,animation:urgent?"pulse 1s infinite":"none"}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",background:urgent?"rgba(239,68,68,.12)":"rgba(59,130,246,.1)",border:`1px solid ${urgent?"rgba(239,68,68,.35)":"rgba(59,130,246,.3)"}`,borderRadius:10,animation:urgent?"pulse 1s infinite":"none"}}>
             <span style={{fontSize:13}}>⏱</span>
-            <span style={{fontSize:18,fontWeight:800,color:urgent?"var(--red)":"var(--blue)",fontVariantNumeric:"tabular-nums",fontFamily:"'JetBrains Mono',monospace"}}>{fmt(timeLeft)}</span>
+            <span style={{fontSize:18,fontWeight:800,color:urgent?"var(--red)":"var(--blue)",fontFamily:"'JetBrains Mono',monospace"}}>{fmt(timeLeft)}</span>
           </div>
           <Btn onClick={()=>setShowConfirm(true)} variant="danger" size="sm">Tugatish</Btn>
         </div>
       </div>
-
-      {/* Progress bar */}
       <div style={{height:3,background:"rgba(255,255,255,.05)"}}>
-        <div style={{height:"100%",background:urgent?"var(--red)":"linear-gradient(90deg,var(--blue),var(--purple))",
-          width:`${pct}%`,transition:"width 1s linear"}}/>
+        <div style={{height:"100%",background:urgent?"var(--red)":"linear-gradient(90deg,var(--blue),var(--purple))",width:`${(timeLeft/(test.time_limit*60))*100}%`,transition:"width 1s linear"}}/>
       </div>
-
-      {/* Statistika */}
       <div style={{display:"flex",gap:8,padding:"12px 12px 0",maxWidth:960,margin:"0 auto",width:"100%"}}>
-        {[
-          {v:answeredCount,c:"var(--green)",bg:"rgba(34,197,94,.08)",l:"Javob"},
-          {v:test.question_count-answeredCount,c:"var(--red)",bg:"rgba(239,68,68,.06)",l:"Qoldi"},
-          {v:test.question_count,c:"var(--blue)",bg:"rgba(59,130,246,.08)",l:"Jami"}
-        ].map(s=>(
+        {[{v:answered,c:"var(--green)",bg:"rgba(34,197,94,.08)",l:"Javob"},{v:test.question_count-answered,c:"var(--red)",bg:"rgba(239,68,68,.06)",l:"Qoldi"},{v:test.question_count,c:"var(--blue)",bg:"rgba(59,130,246,.08)",l:"Jami"}].map(s=>(
           <div key={s.l} style={{flex:1,background:s.bg,borderRadius:10,padding:"8px 4px",textAlign:"center",border:`1px solid ${s.c}22`}}>
             <div style={{color:s.c,fontWeight:800,fontSize:20,lineHeight:1}}>{s.v}</div>
             <div style={{color:"var(--text3)",fontSize:11,marginTop:2}}>{s.l}</div>
           </div>
         ))}
       </div>
-
-      {/* Asosiy kontent */}
       <div style={{flex:1,overflowY:"auto",padding:"12px 12px 32px",WebkitOverflowScrolling:"touch"}}>
         <div style={{maxWidth:960,margin:"0 auto"}}>
-
-          {/* DESKTOP: 2 ustun — chap rasm, o'ng javoblar */}
-          {!isMobile && test.image_url ? (
+          {!isMobile&&imgs.length?(
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
-              <div style={{position:"sticky",top:70}}>
-                <ZoomImage src={test.image_url}/>
-              </div>
-              <div>
-                <QuestionNavigator/>
-                <AnswerCard/>
-                <NavBtns/>
-              </div>
+              <div style={{position:"sticky",top:70}}><Gallery images={imgs}/></div>
+              <div><QuestionNav/><AnswerCard/><NavBtns/></div>
             </div>
-          ) : (
-            // MOBIL: yuqorida rasm, pastda javoblar
-            <>
-              {test.image_url && <ZoomImage src={test.image_url}/>}
-              <QuestionNavigator/>
-              <AnswerCard/>
-              <NavBtns/>
-            </>
+          ):(
+            <>{imgs.length>0&&<Gallery images={imgs}/>}<QuestionNav/><AnswerCard/><NavBtns/></>
           )}
         </div>
       </div>
@@ -963,14 +717,11 @@ const TestPage = ({profile,test,attemptNumber,onFinish}) => {
   );
 };
 
-// ═══════════════════════════════════════════════════
-// NATIJA SAHIFASI
-// ═══════════════════════════════════════════════════
+// ── NATIJA SAHIFASI ───────────────────────────────────────────
 const ResultPage = ({profile,test,attempt,onBack}) => {
-  const grade = getGrade(attempt.score,test.question_count);
-  const pct   = Math.round((attempt.score/test.question_count)*100);
-  const [showDetail,setShowDetail] = useState(false);
-
+  const grade=getGrade(attempt.score,test.question_count);
+  const pct=Math.round((attempt.score/test.question_count)*100);
+  const [showDetail,setShowDetail]=useState(false);
   return (
     <div className="fade" style={{minHeight:"100vh",background:"var(--bg)",padding:"20px 16px 40px",overflowY:"auto"}}>
       <div style={{maxWidth:640,margin:"0 auto"}}>
@@ -978,24 +729,14 @@ const ResultPage = ({profile,test,attempt,onBack}) => {
           <div style={{fontSize:52,marginBottom:12}}>{grade>=4?"🎉":grade===3?"👍":"📚"}</div>
           <h2 style={{fontSize:22,fontWeight:800,color:"var(--text)",marginBottom:4}}>Test yakunlandi!</h2>
           <p style={{color:"var(--text3)",fontSize:14,marginBottom:28}}>{profile.full_name}</p>
-
-          {/* Doira */}
-          <div style={{width:110,height:110,borderRadius:"50%",margin:"0 auto 24px",
-            background:`conic-gradient(${gradeColor(grade)} ${pct}%, rgba(255,255,255,.05) ${pct}%)`,
-            display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 40px ${gradeColor(grade)}44`}}>
+          <div style={{width:110,height:110,borderRadius:"50%",margin:"0 auto 24px",background:`conic-gradient(${gradeColor(grade)} ${pct}%, rgba(255,255,255,.05) ${pct}%)`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 40px ${gradeColor(grade)}44`}}>
             <div style={{width:88,height:88,borderRadius:"50%",background:"var(--bg)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
               <span style={{fontSize:28,fontWeight:900,color:gradeColor(grade)}}>{grade}</span>
               <span style={{fontSize:9,color:"var(--text3)",textTransform:"uppercase"}}>Baho</span>
             </div>
           </div>
-
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
-            {[
-              {l:"To'g'ri",v:attempt.score,c:"var(--green)",i:"✅"},
-              {l:"Noto'g'ri",v:test.question_count-attempt.score,c:"var(--red)",i:"❌"},
-              {l:"Foiz",v:`${pct}%`,c:"var(--blue)",i:"📊"},
-              {l:"Vaqt",v:fmt(attempt.timeTaken),c:"var(--yellow)",i:"⏱"}
-            ].map(s=>(
+            {[{l:"To'g'ri",v:attempt.score,c:"var(--green)",i:"✅"},{l:"Noto'g'ri",v:test.question_count-attempt.score,c:"var(--red)",i:"❌"},{l:"Foiz",v:`${pct}%`,c:"var(--blue)",i:"📊"},{l:"Vaqt",v:fmt(attempt.timeTaken),c:"var(--yellow)",i:"⏱"}].map(s=>(
               <div key={s.l} style={{background:"rgba(255,255,255,.04)",borderRadius:12,padding:"14px 8px"}}>
                 <div style={{fontSize:20,marginBottom:4}}>{s.i}</div>
                 <div style={{fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
@@ -1003,31 +744,20 @@ const ResultPage = ({profile,test,attempt,onBack}) => {
               </div>
             ))}
           </div>
-          <Btn onClick={()=>setShowDetail(v=>!v)} variant="outline" size="sm">
-            {showDetail?"▲ Yashirish":"▼ Javoblar tahlili"}
-          </Btn>
+          <Btn onClick={()=>setShowDetail(v=>!v)} variant="outline" size="sm">{showDetail?"▲ Yashirish":"▼ Javoblar tahlili"}</Btn>
         </Card>
-
-        {showDetail && (
+        {showDetail&&(
           <Card className="fade" style={{marginBottom:16}}>
             <h3 style={{color:"var(--text)",fontWeight:700,marginBottom:14}}>Javoblar tahlili</h3>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
               {Array.from({length:test.question_count},(_,i)=>i+1).map(n=>{
-                const mine=attempt.answers[n]; const correct=test.answer_key[n];
-                const isOk=mine&&mine===correct; const noAns=!mine;
+                const mine=attempt.answers[n];const correct=test.answer_key[n];
+                const isOk=mine&&mine===correct;const noAns=!mine;
                 return (
-                  <div key={n} style={{
-                    background:isOk?"rgba(34,197,94,.07)":noAns?"rgba(245,158,11,.07)":"rgba(239,68,68,.07)",
-                    border:`1px solid ${isOk?"rgba(34,197,94,.2)":noAns?"rgba(245,158,11,.2)":"rgba(239,68,68,.2)"}`,
-                    borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:8}}>
+                  <div key={n} style={{background:isOk?"rgba(34,197,94,.07)":noAns?"rgba(245,158,11,.07)":"rgba(239,68,68,.07)",border:`1px solid ${isOk?"rgba(34,197,94,.2)":noAns?"rgba(245,158,11,.2)":"rgba(239,68,68,.2)"}`,borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:8}}>
                     <span style={{color:"var(--text3)",fontWeight:700,fontSize:12,minWidth:22}}>{n}.</span>
-                    <div>
-                      <div style={{fontSize:10,color:"var(--text3)",marginBottom:1}}>Sizniki</div>
-                      <span style={{fontWeight:800,fontSize:15,color:isOk?"var(--green)":noAns?"var(--yellow)":"var(--red)"}}>{mine||"—"}</span>
-                    </div>
-                    {!isOk&&!noAns&&<><span style={{color:"var(--text3)",fontSize:11}}>→</span>
-                      <div><div style={{fontSize:10,color:"var(--text3)",marginBottom:1}}>To'g'ri</div>
-                        <span style={{fontWeight:800,fontSize:15,color:"var(--green)"}}>{correct}</span></div></>}
+                    <div><div style={{fontSize:10,color:"var(--text3)",marginBottom:1}}>Sizniki</div><span style={{fontWeight:800,fontSize:15,color:isOk?"var(--green)":noAns?"var(--yellow)":"var(--red)"}}>{mine||"—"}</span></div>
+                    {!isOk&&!noAns&&<><span style={{color:"var(--text3)",fontSize:11}}>→</span><div><div style={{fontSize:10,color:"var(--text3)",marginBottom:1}}>To'g'ri</div><span style={{fontWeight:800,fontSize:15,color:"var(--green)"}}>{correct}</span></div></>}
                     {isOk&&<span style={{marginLeft:"auto",fontSize:14}}>✅</span>}
                     {noAns&&<span style={{marginLeft:"auto",fontSize:14}}>⚪</span>}
                   </div>
@@ -1036,197 +766,170 @@ const ResultPage = ({profile,test,attempt,onBack}) => {
             </div>
           </Card>
         )}
-        <div style={{textAlign:"center"}}>
-          <Btn onClick={onBack} variant="ghost" size="lg">← Bosh sahifaga</Btn>
-        </div>
+        <div style={{textAlign:"center"}}><Btn onClick={onBack} variant="ghost" size="lg">← Bosh sahifaga</Btn></div>
       </div>
     </div>
   );
 };
 
-// ═══════════════════════════════════════════════════
-// ADMIN PANELI (oddiy)
-// ═══════════════════════════════════════════════════
+// ── ADMIN PANEL ───────────────────────────────────────────────
 const AdminPanel = ({profile,onLogout}) => {
-  const [users,setUsers]   = useState([]);
-  const [tests,setTests]   = useState([]);
-  const [loading,setLoading] = useState(true);
+  const [tab,setTab]=useState("stats");
+  const [users,setUsers]=useState([]);
+  const [tests,setTests]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [userTab,setUserTab]=useState("teachers");
 
   useEffect(()=>{
-    const load = async ()=>{
-      const {data:u} = await sb.from("profiles").select("*").order("created_at",{ascending:false});
-      const {data:t} = await sb.from("tests").select("*").order("created_at",{ascending:false});
-      setUsers(u||[]); setTests(t||[]); setLoading(false);
+    const load=async()=>{
+      const {data:u}=await sb.from("profiles").select("*").order("created_at",{ascending:false});
+      const {data:t}=await sb.from("tests").select("*").order("created_at",{ascending:false});
+      setUsers(u||[]);setTests(t||[]);setLoading(false);
     };
     load();
   },[]);
 
   if(loading) return <LoadingPage/>;
-
-  const teachers = users.filter(u=>u.role==="teacher");
-  const students = users.filter(u=>u.role==="student");
+  const teachers=users.filter(u=>u.role==="teacher");
+  const students=users.filter(u=>u.role==="student");
+  const TABS=[{id:"stats",icon:"📊",label:"Statistika"},{id:"users",icon:"👥",label:"Foydalanuvchilar"},{id:"tests",icon:"📋",label:"Testlar"}];
 
   return (
-    <div style={{minHeight:"100vh",background:"var(--bg)",padding:"0 0 40px"}}>
-      <div style={{background:"rgba(255,255,255,.02)",borderBottom:"1px solid var(--border)",
-        padding:"0 16px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:20}}>🎓</span>
-          <span style={{fontWeight:800,fontSize:16,color:"var(--text)"}}>Testlyy</span>
-          <Badge color="var(--purple)">Admin</Badge>
-        </div>
+    <div style={{minHeight:"100vh",background:"var(--bg)",paddingBottom:72}}>
+      <div style={{background:"rgba(255,255,255,.02)",borderBottom:"1px solid var(--border)",padding:"0 16px",height:52,position:"sticky",top:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:20}}>🎓</span><span style={{fontWeight:800,fontSize:16,color:"var(--text)"}}>Testlyy</span><Badge color="var(--purple)">Admin</Badge></div>
         <Btn onClick={onLogout} variant="ghost" size="sm">↩ Chiqish</Btn>
       </div>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"rgba(10,15,30,.98)",backdropFilter:"blur(20px)",borderTop:"1px solid var(--border)",display:"flex",height:62}}>
+        {TABS.map(t=>{const act=tab===t.id;return(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,border:"none",cursor:"pointer",background:"transparent",WebkitTapHighlightColor:"transparent",color:act?"var(--purple)":"var(--text3)",position:"relative",transition:"color .2s"}}>
+            {act&&<div style={{position:"absolute",top:0,left:"25%",right:"25%",height:2,background:"var(--purple)",borderRadius:"0 0 3px 3px"}}/>}
+            <span style={{fontSize:20,lineHeight:1}}>{t.icon}</span>
+            <span style={{fontSize:11,fontWeight:act?700:400}}>{t.label}</span>
+          </button>
+        );})}
+      </div>
+      <div style={{maxWidth:960,margin:"0 auto",padding:"16px 14px 24px"}}>
 
-      <div style={{maxWidth:960,margin:"0 auto",padding:"20px 14px"}}>
-        <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:20}}>Boshqaruv paneli</h2>
-
-        {/* Statistika */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:12,marginBottom:24}}>
-          {[
-            {icon:"👨‍🏫",label:"O'qituvchilar",value:teachers.length,color:"var(--blue)"},
-            {icon:"👨‍🎓",label:"O'quvchilar",value:students.length,color:"var(--green)"},
-            {icon:"📋",label:"Testlar",value:tests.length,color:"var(--purple)"},
-            {icon:"✅",label:"Faol testlar",value:tests.filter(t=>t.active).length,color:"var(--yellow)"},
-          ].map(s=>(
-            <Card key={s.label} style={{textAlign:"center",padding:"20px 12px"}}>
-              <div style={{fontSize:28,marginBottom:8}}>{s.icon}</div>
-              <div style={{fontSize:26,fontWeight:800,color:s.color}}>{s.value}</div>
-              <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>{s.label}</div>
-            </Card>
-          ))}
-        </div>
-
-        {/* Foydalanuvchilar */}
-        <Card style={{marginBottom:20}}>
-          <h3 style={{color:"var(--text)",fontWeight:700,marginBottom:16}}>Barcha foydalanuvchilar</h3>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:400}}>
-              <thead>
-                <tr style={{borderBottom:"1px solid var(--border)"}}>
-                  {["Ism","Rol","Email","Qo'shilgan"].map(h=>(
-                    <th key={h} style={{padding:"8px 10px",color:"var(--text3)",fontSize:12,fontWeight:600,textAlign:"left"}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(u=>(
-                  <tr key={u.id} style={{borderBottom:"1px solid rgba(255,255,255,.04)"}}>
-                    <td style={{padding:"10px 10px",color:"var(--text)",fontWeight:600,fontSize:13}}>{u.full_name}</td>
-                    <td style={{padding:"10px 10px"}}>
-                      <Badge color={u.role==="admin"?"var(--purple)":u.role==="teacher"?"var(--blue)":"var(--green)"}>
-                        {u.role==="admin"?"Admin":u.role==="teacher"?"O'qituvchi":"O'quvchi"}
-                      </Badge>
-                    </td>
-                    <td style={{padding:"10px 10px",color:"var(--text3)",fontSize:12}}>{u.id.slice(0,8)}...</td>
-                    <td style={{padding:"10px 10px",color:"var(--text3)",fontSize:12}}>{new Date(u.created_at).toLocaleDateString("uz-UZ")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {tab==="stats"&&(
+          <div className="fade">
+            <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:20}}>Boshqaruv paneli</h2>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12}}>
+              {[{icon:"👨‍🏫",label:"O'qituvchilar",value:teachers.length,color:"var(--blue)"},{icon:"👨‍🎓",label:"O'quvchilar",value:students.length,color:"var(--green)"},{icon:"📋",label:"Jami testlar",value:tests.length,color:"var(--purple)"},{icon:"✅",label:"Faol testlar",value:tests.filter(t=>t.active).length,color:"var(--yellow)"}].map(s=>(
+                <Card key={s.label} style={{textAlign:"center",padding:"20px 12px"}}>
+                  <div style={{fontSize:28,marginBottom:8}}>{s.icon}</div>
+                  <div style={{fontSize:26,fontWeight:800,color:s.color}}>{s.value}</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>{s.label}</div>
+                </Card>
+              ))}
+            </div>
           </div>
-        </Card>
+        )}
+
+        {tab==="users"&&(
+          <div className="fade">
+            <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:16}}>Foydalanuvchilar</h2>
+            <div style={{display:"flex",background:"rgba(0,0,0,.3)",borderRadius:10,padding:3,marginBottom:20,maxWidth:360}}>
+              {[["teachers","👨‍🏫 O'qituvchilar",teachers.length],["students","👨‍🎓 O'quvchilar",students.length]].map(([k,v,cnt])=>(
+                <button key={k} onClick={()=>setUserTab(k)} style={{flex:1,padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,transition:"all .2s",WebkitTapHighlightColor:"transparent",background:userTab===k?"linear-gradient(135deg,#8b5cf6,#7c3aed)":"transparent",color:userTab===k?"#fff":"var(--text3)"}}>{v} ({cnt})</button>
+              ))}
+            </div>
+            <Card>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",minWidth:340}}>
+                  <thead><tr style={{borderBottom:"1px solid var(--border)"}}>{["#","Ism","Qo'shilgan"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--text3)",fontSize:12,fontWeight:600,textAlign:"left"}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {(userTab==="teachers"?teachers:students).map((u,i)=>(
+                      <tr key={u.id} style={{borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+                        <td style={{padding:"10px 10px",color:"var(--text3)",fontSize:13}}>{i+1}</td>
+                        <td style={{padding:"10px 10px",color:"var(--text)",fontWeight:600,fontSize:14}}>{u.full_name}</td>
+                        <td style={{padding:"10px 10px",color:"var(--text3)",fontSize:12}}>{new Date(u.created_at).toLocaleDateString("uz-UZ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!(userTab==="teachers"?teachers:students).length&&<div style={{textAlign:"center",padding:32,color:"var(--text3)"}}>{userTab==="teachers"?"Hali o'qituvchi yo'q":"Hali o'quvchi yo'q"}</div>}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {tab==="tests"&&(
+          <div className="fade">
+            <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:16}}>Barcha testlar</h2>
+            {tests.map(t=>(
+              <Card key={t.id} style={{marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <div style={{minWidth:0}}>
+                  <div style={{color:"var(--text)",fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
+                  <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
+                    <Badge color={t.active?"var(--green)":"var(--text3)"}>{t.active?"Faol":"Nofaol"}</Badge>
+                    <span style={{color:"var(--text3)",fontSize:12}}>{t.question_count} savol · {t.time_limit} min</span>
+                  </div>
+                </div>
+                <span style={{color:"var(--text3)",fontSize:12,whiteSpace:"nowrap"}}>{new Date(t.created_at).toLocaleDateString("uz-UZ")}</span>
+              </Card>
+            ))}
+            {!tests.length&&<Card style={{textAlign:"center",padding:48}}><p style={{color:"var(--text3)"}}>Hali test yo'q</p></Card>}
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// ═══════════════════════════════════════════════════
-// APP — ASOSIY KOMPONENT
-// ═══════════════════════════════════════════════════
+// ── APP ───────────────────────────────────────────────────────
 function App() {
-  const [user,setUser]       = useState(null);
-  const [profile,setProfile] = useState(null);
-  const [authLoading,setAuthLoading] = useState(true);
-  const [session_data,setSessionData] = useState(null); // {test, attemptNumber}
-  const [lastResult,setLastResult]   = useState(null);
+  const [user,setUser]=useState(null);
+  const [profile,setProfile]=useState(null);
+  const [authLoading,setAuthLoading]=useState(true);
+  const [session,setSession]=useState(null);
+  const [lastResult,setLastResult]=useState(null);
 
-  useEffect(()=>{
-    // Auth holati tekshirish
-    sb.auth.getSession().then(({data:{session}})=>{
-      setUser(session?.user||null);
-      if(session?.user) loadProfile(session.user.id);
-      else setAuthLoading(false);
-    });
-    const {data:{subscription}} = sb.auth.onAuthStateChange((_,session)=>{
-      setUser(session?.user||null);
-      if(session?.user) loadProfile(session.user.id);
-      else { setProfile(null); setAuthLoading(false); }
-    });
-    return ()=>subscription.unsubscribe();
+  const loadProfile=useCallback(async uid=>{
+    if(!uid){setAuthLoading(false);return;}
+    let data=null;
+    for(let i=0;i<4;i++){
+      const {data:d}=await sb.from("profiles").select("*").eq("id",uid).single();
+      if(d){data=d;break;}
+      await new Promise(r=>setTimeout(r,700));
+    }
+    if(!data){
+      const {data:au}=await sb.auth.getUser();
+      const meta=au?.user?.user_metadata||{};
+      await sb.from("profiles").upsert({id:uid,full_name:meta.full_name||"Foydalanuvchi",role:meta.role||"student"},{onConflict:"id"});
+      const {data:d2}=await sb.from("profiles").select("*").eq("id",uid).single();
+      data=d2;
+    }
+    setProfile(data||null);setAuthLoading(false);
   },[]);
 
-  const loadProfile = async (uid) => {
-    if(!uid) { setAuthLoading(false); return; }
-    // 3 marta urinib ko'rish — trigger kechikishi mumkin
-    let data = null;
-    for(let i=0; i<3; i++){
-      const res = await sb.from("profiles").select("*").eq("id",uid).single();
-      if(res.data){ data=res.data; break; }
-      await new Promise(r=>setTimeout(r,800));
-    }
-    // Profil topilmasa avtomatik yaratish
-    if(!data){
-      const {data:user} = await sb.auth.getUser();
-      const meta = user?.user?.user_metadata||{};
-      await sb.from("profiles").upsert({
-        id: uid,
-        full_name: meta.full_name || "Foydalanuvchi",
-        role: meta.role || "student"
-      });
-      const res2 = await sb.from("profiles").select("*").eq("id",uid).single();
-      data = res2.data;
-    }
-    setProfile(data||null);
-    setAuthLoading(false);
-  };
+  useEffect(()=>{
+    sb.auth.getSession().then(({data:{session:s}})=>{setUser(s?.user||null);if(s?.user)loadProfile(s.user.id);else setAuthLoading(false);});
+    const {data:{subscription}}=sb.auth.onAuthStateChange((_,s)=>{setUser(s?.user||null);if(s?.user)loadProfile(s.user.id);else{setProfile(null);setAuthLoading(false);}});
+    return()=>subscription.unsubscribe();
+  },[loadProfile]);
 
-  const handleLogout = async () => {
-    await sb.auth.signOut();
-    setSessionData(null); setLastResult(null);
-  };
-
-  const handleStart = ({test,attemptNumber}) => {
-    setSessionData({test,attemptNumber});
-    setLastResult(null);
-  };
-
-  const handleFinish = async ({answers,score,timeTaken,attemptNumber}) => {
-    const test = session_data.test;
-    const total = test.question_count;
-    const percent = Math.round((score/total)*100);
-    const grade = getGrade(score,total);
-    await sb.from("results").insert({
-      student_id:profile.id, test_id:test.id,
-      score, total, percent, grade, time_taken:timeTaken,
-      answers, attempt_number:attemptNumber,
-      finished_at: new Date().toISOString()
-    });
-    setLastResult({answers, score, timeTaken, test: session_data.test});
-    setSessionData(null);
+  const handleLogout=async()=>{await sb.auth.signOut();setSession(null);setLastResult(null);};
+  const handleStart=({test,attemptNumber})=>{setLastResult(null);setSession({test,attemptNumber});};
+  const handleFinish=async({answers,score,timeTaken,attemptNumber})=>{
+    const test=session.test;
+    const total=test.question_count;
+    const percent=Math.round((score/total)*100);
+    const grade=getGrade(score,total);
+    await sb.from("results").insert({student_id:profile.id,test_id:test.id,score,total,percent,grade,time_taken:timeTaken,answers,attempt_number:attemptNumber,can_retry:false,finished_at:new Date().toISOString()});
+    setLastResult({answers,score,timeTaken,test});setSession(null);
   };
 
   if(authLoading) return <LoadingPage text="Tizim yuklanmoqda..."/>;
-  if(!user||!profile) return <LoginPage onLogin={()=>loadProfile(user?.id)}/>;
-
-  // Test ishlayabdi
-  if(session_data) return (
-    <TestPage profile={profile} test={session_data.test} attemptNumber={session_data.attemptNumber}
-      onFinish={handleFinish}/>
-  );
-
-  // Natija ko'rsatish
-  if(lastResult) return (
-    <ResultPage profile={profile} test={lastResult.test} attempt={lastResult} onBack={()=>setLastResult(null)}/>
-  );
-
-  // Role bo'yicha yo'naltirish
-  if(profile.role==="admin")   return <AdminPanel   profile={profile} onLogout={handleLogout}/>;
+  if(!user||!profile) return <LoginPage/>;
+  if(session) return <TestPage profile={profile} test={session.test} attemptNumber={session.attemptNumber} onFinish={handleFinish}/>;
+  if(lastResult) return <ResultPage profile={profile} test={lastResult.test} attempt={lastResult} onBack={()=>setLastResult(null)}/>;
+  if(profile.role==="admin") return <AdminPanel profile={profile} onLogout={handleLogout}/>;
   if(profile.role==="teacher") return <TeacherPanel profile={profile} onLogout={handleLogout}/>;
   return <StudentEntry profile={profile} onStart={handleStart} onLogout={handleLogout}/>;
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+const root=ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App/>);
 </script>
 </body>
