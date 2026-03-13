@@ -25,11 +25,13 @@ body{font-family:'Outfit',sans-serif;background:#0a0f1e;color:#e2e8f0;overflow-x
 ::-webkit-scrollbar-track{background:var(--bg2)}
 ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:4px}
 input,select,button,textarea{font-family:'Outfit',sans-serif}
-.fade{animation:fadeUp .3s ease both}
-@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fadeUp .35s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 .spin{animation:spin .8s linear infinite}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px}
 .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:28px;max-width:380px;width:100%;animation:fadeUp .2s ease}
@@ -38,6 +40,36 @@ input,select,button,textarea{font-family:'Outfit',sans-serif}
 .gallery-wrap{position:relative;border-radius:12px;overflow:visible;background:var(--bg3);border:1px solid var(--border);margin-bottom:14px}
 .gallery-img{width:100%;display:block;object-fit:contain;max-height:calc(100vh - 180px);min-height:280px;cursor:zoom-in;border-radius:12px}
 .gnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.65);border:none;color:#fff;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);z-index:2}
+
+/* ── AUTH PAGES ── */
+.auth-bg{min-height:100vh;background:radial-gradient(ellipse at 20% 20%,rgba(59,130,246,.15) 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,rgba(139,92,246,.1) 0%,transparent 50%),var(--bg);display:flex;flex-direction:column}
+.auth-nav{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border);background:rgba(10,15,30,.8);backdrop-filter:blur(16px);position:sticky;top:0;z-index:100;flex-shrink:0}
+.auth-nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.auth-nav-logo-icon{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.auth-nav-logo-text{font-weight:800;font-size:18px;color:var(--text);letter-spacing:-0.5px}
+.auth-nav-links{display:flex;align-items:center;gap:8px}
+.auth-body{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px 40px}
+.auth-card{background:rgba(255,255,255,.03);border:1px solid var(--border2);border-radius:24px;padding:36px 32px;width:100%;max-width:420px;backdrop-filter:blur(8px)}
+.auth-card-title{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-0.5px;margin-bottom:6px}
+.auth-card-sub{color:var(--text3);font-size:14px;margin-bottom:28px}
+.nav-btn-ghost{padding:8px 18px;border-radius:10px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-weight:600;font-size:14px;cursor:pointer;transition:all .2s;font-family:'Outfit',sans-serif;white-space:nowrap;WebkitTapHighlightColor:transparent}
+.nav-btn-ghost:hover{background:rgba(255,255,255,.06);color:var(--text);border-color:var(--border)}
+.nav-btn-primary{padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-weight:600;font-size:14px;cursor:pointer;transition:all .2s;font-family:'Outfit',sans-serif;box-shadow:0 4px 14px rgba(59,130,246,.3);white-space:nowrap;WebkitTapHighlightColor:transparent}
+.nav-btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,.4)}
+.nav-btn-success{padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:600;font-size:14px;cursor:pointer;transition:all .2s;font-family:'Outfit',sans-serif;box-shadow:0 4px 14px rgba(34,197,94,.3);white-space:nowrap;WebkitTapHighlightColor:transparent}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--text3);font-size:13px}
+.auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--border)}
+.auth-link{color:var(--blue);font-weight:600;cursor:pointer;text-decoration:none;transition:color .2s}
+.auth-link:hover{color:#60a5fa}
+.features-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:20px}
+@media(max-width:480px){
+  .auth-nav{padding:0 14px}
+  .auth-nav-logo-text{font-size:16px}
+  .auth-card{padding:24px 18px}
+  .auth-card-title{font-size:22px}
+  .nav-btn-ghost,.nav-btn-primary,.nav-btn-success{padding:7px 12px;font-size:13px}
+  .features-grid{grid-template-columns:1fr 1fr}
+}
 </style>
 </head>
 <body>
@@ -74,6 +106,18 @@ const Btn = ({children,onClick,variant="primary",size="md",disabled,full,style:s
   return <button onClick={disabled?undefined:onClick} style={{border:"none",borderRadius:10,fontWeight:600,cursor:disabled?"not-allowed":"pointer",transition:"all .2s",opacity:disabled?.45:1,touchAction:"manipulation",padding:pad,fontSize:fs,WebkitTapHighlightColor:"transparent",userSelect:"none",width:full?"100%":"auto",...V[variant],...sx}}>{children}</button>;
 };
 
+const FormInput = ({label,error,...props}) => (
+  <div style={{marginBottom:18}}>
+    {label&&<label style={{display:"block",fontSize:13,color:"var(--text2)",marginBottom:7,fontWeight:600}}>{label}</label>}
+    <input {...props} style={{width:"100%",padding:"13px 16px",background:"rgba(255,255,255,.05)",border:`1px solid ${error?"var(--red)":"rgba(255,255,255,.1)"}`,borderRadius:12,color:"var(--text)",fontSize:15,outline:"none",WebkitAppearance:"none",transition:"all .2s",...(props.style||{})}}
+      onFocus={e=>{e.target.style.borderColor="var(--blue)";e.target.style.background="rgba(59,130,246,.05)";}}
+      onBlur={e=>{e.target.style.borderColor=error?"var(--red)":"rgba(255,255,255,.1)";e.target.style.background="rgba(255,255,255,.05)";}}
+    />
+    {error&&<p style={{color:"var(--red)",fontSize:12,marginTop:5}}>⚠ {error}</p>}
+  </div>
+);
+
+// Legacy Input for teacher/admin panels
 const Input = ({label,error,...props}) => (
   <div style={{marginBottom:16}}>
     {label&&<label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{label}</label>}
@@ -92,7 +136,7 @@ const Badge = ({children,color="var(--blue)"}) => (
 
 const Alert = ({type="error",children}) => {
   const c=type==="error"?"var(--red)":type==="success"?"var(--green)":"var(--yellow)";
-  return <div style={{background:c+"18",border:`1px solid ${c}44`,borderRadius:10,padding:"10px 14px",fontSize:13,color:c,marginBottom:12}}>{children}</div>;
+  return <div style={{background:c+"18",border:`1px solid ${c}44`,borderRadius:10,padding:"10px 14px",fontSize:13,color:c,marginBottom:14}}>{children}</div>;
 };
 
 const ConfirmModal = ({message,confirmText="Ha, o'chirish",danger=true,onConfirm,onCancel}) => (
@@ -109,12 +153,14 @@ const ConfirmModal = ({message,confirmText="Ha, o'chirish",danger=true,onConfirm
 );
 
 const LoadingPage = ({text="Yuklanmoqda..."}) => (
-  <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
-    <Spinner size={40}/><p style={{color:"var(--text2)",fontSize:14}}>{text}</p>
+  <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,background:"var(--bg)"}}>
+    <div style={{fontSize:40,animation:"float 2s ease-in-out infinite"}}>🎓</div>
+    <Spinner size={36}/>
+    <p style={{color:"var(--text2)",fontSize:14}}>{text}</p>
   </div>
 );
 
-// ── GALEREYA (max 5 rasm + lightbox) ────────────────────────
+// ── GALEREYA ─────────────────────────────────────────────────
 const Gallery = ({images=[]}) => {
   const [idx,setIdx]=useState(0);
   const [open,setOpen]=useState(false);
@@ -136,7 +182,7 @@ const Gallery = ({images=[]}) => {
       </div>
       {open&&(
         <div className="lightbox" onClick={()=>setOpen(false)}>
-          <button onClick={()=>setOpen(false)} style={{position:"absolute",top:14,right:14,width:40,height:40,borderRadius:"50%",background:"var(--red)",border:"none",color:"#fff",fontSize:22,cursor:"pointer",zIndex:999999,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 12px rgba(0,0,0,.5)"}}>×</button>
+          <button onClick={()=>setOpen(false)} style={{position:"absolute",top:14,right:14,width:40,height:40,borderRadius:"50%",background:"var(--red)",border:"none",color:"#fff",fontSize:22,cursor:"pointer",zIndex:999999,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
           {imgs.length>1&&<><button className="gnav" onClick={prev} style={{left:12,position:"absolute",width:46,height:46}}>&#8249;</button><button className="gnav" onClick={next} style={{right:12,position:"absolute",width:46,height:46}}>&#8250;</button></>}
           <img src={imgs[idx]} alt="katta" onClick={e=>e.stopPropagation()}/>
           {imgs.length>1&&(
@@ -150,83 +196,237 @@ const Gallery = ({images=[]}) => {
   );
 };
 
-// ── LOGIN ────────────────────────────────────────────────────
-const LoginPage = () => {
-  const [mode,setMode]=useState("login");
-  const [lf,setLf]=useState({email:"",password:""});
-  const [rf,setRf]=useState({email:"",password:"",full_name:"",role:"student"});
+// ── LOGIN SAHIFASI ────────────────────────────────────────────
+const LoginPage = ({onSwitchToRegister}) => {
+  const [form,setForm]=useState({email:"",password:""});
   const [err,setErr]=useState("");
   const [loading,setLoading]=useState(false);
 
   const handleLogin = async () => {
     setErr("");
-    if(!lf.email||!lf.password) return setErr("Email va parol kiriting!");
+    if(!form.email||!form.password) return setErr("Email va parolni kiriting!");
     setLoading(true);
-    const {data:sd,error}=await sb.auth.signInWithPassword({email:lf.email,password:lf.password});
+    const {error}=await sb.auth.signInWithPassword({email:form.email,password:form.password});
     if(error){
-      if(error.message.includes("Email not confirmed")) setErr("Email tasdiqlanmagan! Admin bilan bog'laning.");
-      else if(error.message.includes("Invalid login")) setErr("Email yoki parol noto'g'ri!");
+      if(error.message.includes("Invalid login")) setErr("Email yoki parol noto'g'ri!");
       else setErr(error.message);
     }
     setLoading(false);
   };
 
+  return (
+    <div className="auth-bg">
+      {/* NAV */}
+      <nav className="auth-nav">
+        <div className="auth-nav-logo">
+          <div className="auth-nav-logo-icon">🎓</div>
+          <span className="auth-nav-logo-text">Testlyy</span>
+        </div>
+        <div className="auth-nav-links">
+          <button className="nav-btn-ghost" style={{fontFamily:"'Outfit',sans-serif"}} disabled>Kirish</button>
+          <button className="nav-btn-success" style={{fontFamily:"'Outfit',sans-serif"}} onClick={onSwitchToRegister}>Ro'yxatdan o'tish</button>
+        </div>
+      </nav>
+
+      {/* BODY */}
+      <div className="auth-body">
+        <div className="auth-card fade">
+          <div style={{textAlign:"center",marginBottom:28}}>
+            <div style={{width:60,height:60,borderRadius:16,background:"linear-gradient(135deg,#3b82f6,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 14px",boxShadow:"0 8px 32px rgba(99,102,241,.3)",animation:"float 3s ease-in-out infinite"}}>🎓</div>
+            <h1 className="auth-card-title">Xush kelibsiz!</h1>
+            <p className="auth-card-sub">Hisobingizga kiring</p>
+          </div>
+
+          <FormInput
+            label="📧 Email"
+            type="email"
+            value={form.email}
+            onChange={e=>setForm(p=>({...p,email:e.target.value}))}
+            placeholder="email@maktab.uz"
+            autoCapitalize="none"
+            autoComplete="email"
+          />
+          <FormInput
+            label="🔒 Parol"
+            type="password"
+            value={form.password}
+            onChange={e=>setForm(p=>({...p,password:e.target.value}))}
+            placeholder="••••••••"
+            autoComplete="current-password"
+            onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+          />
+
+          {err&&<Alert type="error">{err}</Alert>}
+
+          <button
+            onClick={loading?undefined:handleLogin}
+            style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:loading?"rgba(59,130,246,.5)":"linear-gradient(135deg,#3b82f6,#2563eb)",color:"#fff",fontSize:16,fontWeight:700,cursor:loading?"not-allowed":"pointer",transition:"all .2s",boxShadow:"0 4px 18px rgba(59,130,246,.35)",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"'Outfit',sans-serif",marginBottom:20}}
+          >
+            {loading?<><Spinner size={18} color="#fff"/>Kirilmoqda...</>:"Kirish →"}
+          </button>
+
+          <p style={{textAlign:"center",color:"var(--text3)",fontSize:14}}>
+            Hisobingiz yo'qmi?{" "}
+            <span className="auth-link" onClick={onSwitchToRegister}>Ro'yxatdan o'ting</span>
+          </p>
+
+          {/* Features */}
+          <div style={{marginTop:28,paddingTop:24,borderTop:"1px solid var(--border)"}}>
+            <p style={{color:"var(--text3)",fontSize:12,textAlign:"center",marginBottom:14,textTransform:"uppercase",letterSpacing:1}}>Platform imkoniyatlari</p>
+            <div className="features-grid">
+              {[["📝","Testlar","O'qituvchilar tomonidan"],["⏱","Timer","Vaqt cheklovi bilan"],["📊","Natijalar","Baho va tahlil"]].map(([ic,t,s])=>(
+                <div key={t} style={{background:"rgba(255,255,255,.03)",borderRadius:10,padding:"12px 8px",textAlign:"center",border:"1px solid var(--border)"}}>
+                  <div style={{fontSize:22,marginBottom:5}}>{ic}</div>
+                  <div style={{fontSize:12,fontWeight:700,color:"var(--text2)"}}>{t}</div>
+                  <div style={{fontSize:10,color:"var(--text3)",marginTop:2}}>{s}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── RO'YXATDAN O'TISH SAHIFASI ────────────────────────────────
+const RegisterPage = ({onSwitchToLogin}) => {
+  const [form,setForm]=useState({full_name:"",email:"",password:"",role:"student"});
+  const [err,setErr]=useState("");
+  const [success,setSuccess]=useState(false);
+  const [loading,setLoading]=useState(false);
+
   const handleRegister = async () => {
     setErr("");
-    if(!rf.email||!rf.password||!rf.full_name) return setErr("Barcha maydonlarni to'ldiring!");
-    if(rf.password.length<6) return setErr("Parol kamida 6 ta belgi!");
+    if(!form.full_name.trim()||!form.email||!form.password) return setErr("Barcha maydonlarni to'ldiring!");
+    if(form.password.length<6) return setErr("Parol kamida 6 ta belgi bo'lsin!");
     setLoading(true);
-    const {data,error}=await sb.auth.signUp({email:rf.email,password:rf.password,options:{data:{full_name:rf.full_name,role:rf.role}}});
+    const {data,error}=await sb.auth.signUp({
+      email:form.email,
+      password:form.password,
+      options:{data:{full_name:form.full_name.trim(),role:form.role}}
+    });
     if(error){setErr(error.message);setLoading(false);return;}
-    if(data?.user){
-      await sb.from("profiles").upsert({id:data.user.id,full_name:rf.full_name,role:rf.role,email:rf.email},{onConflict:"id"});
-    }
-    if(!data?.session){
-      setRf({email:"",password:"",full_name:"",role:"student"});
-      setMode("login");
-      setLf({email:rf.email,password:""});
-      alert("✅ Ro'yxatdan o'tildi! Endi kiring.");
+
+    // Agar session darhol kelsa (email confirmation off) — profil trigger yaratadi
+    // Agar session kelmasa — foydalanuvchi login qilishi kerak
+    if(data?.session){
+      // Session bor — onAuthStateChange ishlaydi, loadProfile chaqiriladi
+      // Hech narsa qilmaymiz, App o'zi boshqaradi
+    } else {
+      // Email confirmation bor yoki boshqa sabab
+      setSuccess(true);
     }
     setLoading(false);
   };
 
-  return (
-    <div className="fade" style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"radial-gradient(ellipse at 30% 20%,rgba(59,130,246,.12) 0%,transparent 60%),var(--bg)"}}>
-      <div style={{width:"100%",maxWidth:400}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{width:72,height:72,borderRadius:20,margin:"0 auto 14px",background:"linear-gradient(135deg,#3b82f6,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,boxShadow:"0 8px 32px rgba(99,102,241,.4)"}}>🎓</div>
-          <h1 style={{fontSize:28,fontWeight:800,color:"var(--text)",letterSpacing:-1}}>Testlyy</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:4}}>Maktab test platformasi</p>
+  if(success) return (
+    <div className="auth-bg">
+      <nav className="auth-nav">
+        <div className="auth-nav-logo"><div className="auth-nav-logo-icon">🎓</div><span className="auth-nav-logo-text">Testlyy</span></div>
+        <div className="auth-nav-links">
+          <button className="nav-btn-primary" style={{fontFamily:"'Outfit',sans-serif"}} onClick={onSwitchToLogin}>Kirish</button>
         </div>
-        <Card style={{padding:28}}>
-          <div style={{display:"flex",background:"rgba(0,0,0,.3)",borderRadius:10,padding:3,marginBottom:24}}>
-            {[["login","Kirish"],["register","Ro'yxat"]].map(([k,v])=>(
-              <button key={k} onClick={()=>{setMode(k);setErr("");}} style={{flex:1,padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontWeight:600,fontSize:14,transition:"all .2s",WebkitTapHighlightColor:"transparent",background:mode===k?"linear-gradient(135deg,#3b82f6,#2563eb)":"transparent",color:mode===k?"#fff":"var(--text3)"}}>{v}</button>
-            ))}
-          </div>
-          {mode==="register"?<>
-            <Input label="To'liq ism" value={rf.full_name} onChange={e=>setRf(p=>({...p,full_name:e.target.value}))} placeholder="Abdullayev Jasur"/>
-            <div style={{marginBottom:16}}>
-              <label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:6,fontWeight:600,textTransform:"uppercase"}}>Rol</label>
-              <select value={rf.role} onChange={e=>setRf(p=>({...p,role:e.target.value}))} style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",border:"1px solid var(--border2)",borderRadius:10,color:"var(--text)",fontSize:15,outline:"none"}}>
-                <option value="student">👨‍🎓 O'quvchi</option>
-                <option value="teacher">👨‍🏫 O'qituvchi</option>
-              </select>
-            </div>
-            <Input label="Email" type="email" value={rf.email} onChange={e=>setRf(p=>({...p,email:e.target.value}))} placeholder="email@maktab.uz" autoCapitalize="none"/>
-            <Input label="Parol" type="password" value={rf.password} onChange={e=>setRf(p=>({...p,password:e.target.value}))} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&handleRegister()}/>
-            {err&&<Alert type="error">{err}</Alert>}
-            <Btn onClick={handleRegister} variant="success" full size="lg" disabled={loading}>{loading?<Spinner size={18} color="#fff"/>:"Ro'yxatdan o'tish →"}</Btn>
-          </>:<>
-            <Input label="Email" type="email" value={lf.email} onChange={e=>setLf(p=>({...p,email:e.target.value}))} placeholder="email@maktab.uz" autoCapitalize="none"/>
-            <Input label="Parol" type="password" value={lf.password} onChange={e=>setLf(p=>({...p,password:e.target.value}))} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&handleLogin()}/>
-            {err&&<Alert type="error">{err}</Alert>}
-            <Btn onClick={handleLogin} variant="primary" full size="lg" disabled={loading}>{loading?<Spinner size={18} color="#fff"/>:"Kirish →"}</Btn>
-          </>}
-        </Card>
+      </nav>
+      <div className="auth-body">
+        <div className="auth-card fade" style={{textAlign:"center"}}>
+          <div style={{fontSize:56,marginBottom:16}}>✅</div>
+          <h2 style={{fontSize:22,fontWeight:800,color:"var(--text)",marginBottom:8}}>Muvaffaqiyatli!</h2>
+          <p style={{color:"var(--text2)",fontSize:15,marginBottom:24,lineHeight:1.6}}>Ro'yxatdan o'tdingiz.<br/>Endi hisobingizga kiring.</p>
+          <button onClick={onSwitchToLogin} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#3b82f6,#2563eb)",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>Kirishga o'tish →</button>
+        </div>
       </div>
     </div>
   );
+
+  return (
+    <div className="auth-bg">
+      {/* NAV */}
+      <nav className="auth-nav">
+        <div className="auth-nav-logo">
+          <div className="auth-nav-logo-icon">🎓</div>
+          <span className="auth-nav-logo-text">Testlyy</span>
+        </div>
+        <div className="auth-nav-links">
+          <button className="nav-btn-ghost" style={{fontFamily:"'Outfit',sans-serif"}} onClick={onSwitchToLogin}>Kirish</button>
+          <button className="nav-btn-success" style={{fontFamily:"'Outfit',sans-serif"}} disabled>Ro'yxatdan o'tish</button>
+        </div>
+      </nav>
+
+      {/* BODY */}
+      <div className="auth-body">
+        <div className="auth-card fade">
+          <div style={{textAlign:"center",marginBottom:28}}>
+            <div style={{width:60,height:60,borderRadius:16,background:"linear-gradient(135deg,#22c55e,#16a34a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 14px",boxShadow:"0 8px 32px rgba(34,197,94,.25)",animation:"float 3s ease-in-out infinite"}}>✨</div>
+            <h1 className="auth-card-title">Hisob yaratish</h1>
+            <p className="auth-card-sub">Platformaga qo'shiling</p>
+          </div>
+
+          <FormInput
+            label="👤 To'liq ism"
+            value={form.full_name}
+            onChange={e=>setForm(p=>({...p,full_name:e.target.value}))}
+            placeholder="Abdullayev Jasur"
+            autoComplete="name"
+          />
+
+          {/* Rol tanlash */}
+          <div style={{marginBottom:18}}>
+            <label style={{display:"block",fontSize:13,color:"var(--text2)",marginBottom:7,fontWeight:600}}>🎭 Rol</label>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {[{v:"student",icon:"👨‍🎓",label:"O'quvchi",desc:"Testlarni ishlash"},{v:"teacher",icon:"👨‍🏫",label:"O'qituvchi",desc:"Test yaratish"}].map(r=>(
+                <div key={r.v} onClick={()=>setForm(p=>({...p,role:r.v}))} style={{padding:"14px 10px",borderRadius:12,border:`2px solid ${form.role===r.v?"var(--blue)":"rgba(255,255,255,.08)"}`,cursor:"pointer",textAlign:"center",transition:"all .2s",background:form.role===r.v?"rgba(59,130,246,.08)":"rgba(255,255,255,.02)"}}>
+                  <div style={{fontSize:24,marginBottom:5}}>{r.icon}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:form.role===r.v?"var(--blue)":"var(--text)"}}>{r.label}</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{r.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <FormInput
+            label="📧 Email"
+            type="email"
+            value={form.email}
+            onChange={e=>setForm(p=>({...p,email:e.target.value}))}
+            placeholder="email@maktab.uz"
+            autoCapitalize="none"
+            autoComplete="email"
+          />
+          <FormInput
+            label="🔒 Parol"
+            type="password"
+            value={form.password}
+            onChange={e=>setForm(p=>({...p,password:e.target.value}))}
+            placeholder="Kamida 6 ta belgi"
+            autoComplete="new-password"
+            onKeyDown={e=>e.key==="Enter"&&handleRegister()}
+          />
+
+          {err&&<Alert type="error">{err}</Alert>}
+
+          <button
+            onClick={loading?undefined:handleRegister}
+            style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:loading?"rgba(34,197,94,.5)":"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",fontSize:16,fontWeight:700,cursor:loading?"not-allowed":"pointer",transition:"all .2s",boxShadow:"0 4px 18px rgba(34,197,94,.3)",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"'Outfit',sans-serif",marginBottom:20}}
+          >
+            {loading?<><Spinner size={18} color="#fff"/>Yaratilmoqda...</>:"Hisob yaratish →"}
+          </button>
+
+          <p style={{textAlign:"center",color:"var(--text3)",fontSize:14}}>
+            Hisobingiz bormi?{" "}
+            <span className="auth-link" onClick={onSwitchToLogin}>Kiring</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── AUTH ROUTER (login/register sahifalari) ───────────────────
+const AuthPages = () => {
+  const [page,setPage]=useState("login");
+  if(page==="login") return <LoginPage onSwitchToRegister={()=>setPage("register")}/>;
+  return <RegisterPage onSwitchToLogin={()=>setPage("login")}/>;
 };
 
 // ── JAVOB TANLASH ─────────────────────────────────────────────
@@ -369,7 +569,6 @@ const TeacherPanel = ({profile,onLogout}) => {
         );})}
       </div>
       <div style={{maxWidth:960,margin:"0 auto",padding:"16px 14px 24px"}}>
-
         {tab==="tests"&&(
           <div className="fade">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -450,7 +649,6 @@ const TeacherPanel = ({profile,onLogout}) => {
             })}
           </div>
         )}
-
         {tab==="manage"&&(
           <div className="fade">
             <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:20}}>Test boshqarish</h2>
@@ -493,7 +691,6 @@ const TeacherPanel = ({profile,onLogout}) => {
             })}
           </div>
         )}
-
         {tab==="results"&&(
           <div className="fade">
             <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:20}}>Natijalar</h2>
@@ -538,7 +735,7 @@ const TeacherPanel = ({profile,onLogout}) => {
   );
 };
 
-// ── O'QUVCHI ENTRY ───────────────────────────────────────────
+// ── O'QUVCHI ENTRY ────────────────────────────────────────────
 const StudentEntry = ({profile,onStart,onLogout}) => {
   const [tests,setTests]=useState([]);
   const [myResults,setMyRes]=useState([]);
@@ -681,7 +878,7 @@ const TestPage = ({profile,test,attemptNumber,onFinish}) => {
 
   return (
     <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",flexDirection:"column"}}>
-      {showConfirm&&<ConfirmModal message={`${test.question_count-answered>0?"⚠ "+( test.question_count-answered)+" ta savol javobsiz!\n\n":""}Testni tugatmoqchimisiz?`} confirmText="Ha, tugatish" danger={false} onConfirm={()=>{setShowConfirm(false);doFinish();}} onCancel={()=>setShowConfirm(false)}/>}
+      {showConfirm&&<ConfirmModal message={`${test.question_count-answered>0?"⚠ "+(test.question_count-answered)+" ta savol javobsiz!\n\n":""}Testni tugatmoqchimisiz?`} confirmText="Ha, tugatish" danger={false} onConfirm={()=>{setShowConfirm(false);doFinish();}} onCancel={()=>setShowConfirm(false)}/>}
       <div style={{background:"rgba(10,15,30,.97)",backdropFilter:"blur(12px)",borderBottom:"1px solid var(--border)",padding:"0 12px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,position:"sticky",top:0,zIndex:100,gap:8}}>
         <div style={{minWidth:0}}>
           <div style={{color:"var(--text)",fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{test.title}</div>
@@ -709,10 +906,8 @@ const TestPage = ({profile,test,attemptNumber,onFinish}) => {
       <div style={{flex:1,overflowY:"auto",padding:"12px 12px 32px",WebkitOverflowScrolling:"touch"}}>
         <div style={{maxWidth:960,margin:"0 auto"}}>
           {!isMobile&&imgs.length?(
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start",minHeight:"calc(100vh - 140px)"}}>
-              <div style={{position:"sticky",top:68,height:"calc(100vh - 140px)",display:"flex",alignItems:"center"}}>
-                <div style={{width:"100%"}}><Gallery images={imgs}/></div>
-              </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
+              <div style={{position:"sticky",top:68}}><Gallery images={imgs}/></div>
               <div><QuestionNav/><AnswerCard/><NavBtns/></div>
             </div>
           ):(
@@ -817,7 +1012,6 @@ const AdminPanel = ({profile,onLogout}) => {
         );})}
       </div>
       <div style={{maxWidth:960,margin:"0 auto",padding:"16px 14px 24px"}}>
-
         {tab==="stats"&&(
           <div className="fade">
             <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:20}}>Boshqaruv paneli</h2>
@@ -832,7 +1026,6 @@ const AdminPanel = ({profile,onLogout}) => {
             </div>
           </div>
         )}
-
         {tab==="users"&&(
           <div className="fade">
             <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:16}}>Foydalanuvchilar</h2>
@@ -861,7 +1054,6 @@ const AdminPanel = ({profile,onLogout}) => {
             </Card>
           </div>
         )}
-
         {tab==="tests"&&(
           <div className="fade">
             <h2 style={{fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:16}}>Barcha testlar</h2>
@@ -894,66 +1086,92 @@ function App() {
   const [session,setSession]=useState(null);
   const [lastResult,setLastResult]=useState(null);
 
-  const loadProfile=useCallback(async (uid,authUser)=>{
+  // ✅ BUG FIX: loadProfile — profil topilmasa o'zi yaratadi
+  const loadProfile=useCallback(async(uid,authUser)=>{
     if(!uid){setAuthLoading(false);return;}
     setProfileError("");
-    // 1: DB dan profil qidirish
+
+    // 1: DB dan profil qidirish (3 marta urinish)
     let data=null;
-    for(let i=0;i<5;i++){
-      const {data:d,error:e}=await sb.from("profiles").select("*").eq("id",uid).single();
+    for(let i=0;i<3;i++){
+      const {data:d}=await sb.from("profiles").select("*").eq("id",uid).single();
       if(d){data=d;break;}
-      await new Promise(r=>setTimeout(r,800));
+      if(i<2) await new Promise(r=>setTimeout(r,600));
     }
-    // 2: Topilmasa — yaratish
+
+    // 2: Topilmasa — o'zi yaratadi (auth.uid() = uid, shuning uchun RLS ishlaydi)
     if(!data){
       const email=authUser?.email||"";
       const meta=authUser?.user_metadata||{};
-      const {error:uErr}=await sb.from("profiles").upsert({
+      const full_name=meta.full_name||email.split("@")[0]||"Foydalanuvchi";
+      const role=meta.role||"student";
+
+      await sb.from("profiles").upsert({
         id:uid,
-        full_name:meta.full_name||email.split("@")[0]||"Foydalanuvchi",
-        role:meta.role||"student",
-        email:email
+        full_name,
+        role,
+        email
       },{onConflict:"id"});
-      if(!uErr){
-        const {data:d2}=await sb.from("profiles").select("*").eq("id",uid).single();
-        data=d2;
-      }
+
+      // Yaratilganidan keyin o'qish
+      const {data:d3}=await sb.from("profiles").select("*").eq("id",uid).single();
+      data=d3;
     }
-    if(data){setProfile(data);setAuthLoading(false);}
-    else{setProfileError("Profilingiz topilmadi. Iltimos qayta kiring.");setAuthLoading(false);}
+
+    if(data){
+      setProfile(data);
+      setAuthLoading(false);
+    } else {
+      setProfileError("Profil yuklanmadi. Qayta urinib ko'ring.");
+      setAuthLoading(false);
+    }
   },[]);
 
   useEffect(()=>{
     sb.auth.getSession().then(({data:{session:s}})=>{
       const u=s?.user||null;setUser(u);
-      if(u)loadProfile(u.id,u);else setAuthLoading(false);
+      if(u) loadProfile(u.id,u);
+      else setAuthLoading(false);
     });
-    const {data:{subscription}}=sb.auth.onAuthStateChange((_,s)=>{
+    const {data:{subscription}}=sb.auth.onAuthStateChange((_event,s)=>{
       const u=s?.user||null;setUser(u);
-      if(u)loadProfile(u.id,u);else{setProfile(null);setProfileError("");setAuthLoading(false);}
+      if(u) loadProfile(u.id,u);
+      else{setProfile(null);setProfileError("");setAuthLoading(false);}
     });
     return()=>subscription.unsubscribe();
   },[loadProfile]);
 
-  const handleLogout=async()=>{await sb.auth.signOut();setSession(null);setLastResult(null);};
+  const handleLogout=async()=>{
+    await sb.auth.signOut();
+    setSession(null);
+    setLastResult(null);
+    setProfile(null);
+  };
+
   const handleStart=({test,attemptNumber})=>{setLastResult(null);setSession({test,attemptNumber});};
+
   const handleFinish=async({answers,score,timeTaken,attemptNumber})=>{
     const test=session.test;
     const total=test.question_count;
     const percent=Math.round((score/total)*100);
     const grade=getGrade(score,total);
-    await sb.from("results").insert({student_id:profile.id,test_id:test.id,score,total,percent,grade,time_taken:timeTaken,answers,attempt_number:attemptNumber,can_retry:false,finished_at:new Date().toISOString()});
-    setLastResult({answers,score,timeTaken,test});setSession(null);
+    await sb.from("results").insert({
+      student_id:profile.id,test_id:test.id,score,total,percent,grade,
+      time_taken:timeTaken,answers,attempt_number:attemptNumber,
+      can_retry:false,finished_at:new Date().toISOString()
+    });
+    setLastResult({answers,score,timeTaken,test});
+    setSession(null);
   };
 
   if(authLoading) return <LoadingPage text="Tizim yuklanmoqda..."/>;
-  if(!user) return <LoginPage/>;
+  if(!user) return <AuthPages/>;
   if(profileError) return (
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:20,background:"var(--bg)"}}>
       <div style={{fontSize:48}}>⚠️</div>
       <p style={{color:"var(--red)",fontSize:16,textAlign:"center",maxWidth:320}}>{profileError}</p>
-      <Btn onClick={async()=>{setProfileError("");setAuthLoading(true);await loadProfile(user.id,user);}} variant="primary">Qayta urinish</Btn>
-      <Btn onClick={async()=>{await sb.auth.signOut();}} variant="ghost" size="sm">Chiqish</Btn>
+      <Btn onClick={async()=>{setProfileError("");setAuthLoading(true);const{data:{session:s}}=await sb.auth.getSession();if(s?.user)await loadProfile(s.user.id,s.user);}} variant="primary">Qayta urinish</Btn>
+      <Btn onClick={handleLogout} variant="ghost" size="sm">Chiqish</Btn>
     </div>
   );
   if(!profile) return <LoadingPage text="Profil yuklanmoqda..."/>;
