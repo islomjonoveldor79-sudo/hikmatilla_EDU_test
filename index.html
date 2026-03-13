@@ -1030,34 +1030,45 @@ const StudentEntry = ({profile,onStart,onLogout}) => {
         {/* Code input */}
         <div style={{marginBottom:8}}>
           <label style={{display:"block",fontSize:11,color:"var(--text2)",fontWeight:700,textTransform:"uppercase",marginBottom:8,letterSpacing:.5}}>🔑 Test kodi</label>
-          <div style={{display:"flex",gap:8}}>
-            <input
-              value={code}
-              onChange={e=>setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6))}
-              onKeyDown={e=>e.key==="Enter"&&handleGo()}
-              placeholder="XXXXXX"
-              maxLength={6}
-              style={{
-                flex:1,padding:"14px 16px",
-                background:"rgba(255,255,255,.05)",
-                border:"2px solid "+(err?"var(--red)":"var(--border2)"),
-                borderRadius:12,color:"var(--text)",
-                fontSize:22,fontWeight:800,
-                fontFamily:"'JetBrains Mono',monospace",
-                letterSpacing:6,textAlign:"center",
-                outline:"none",transition:"border-color .2s",
-                textTransform:"uppercase",
-              }}
-              autoComplete="off"
-              autoCapitalize="characters"
-            />
-            <Btn onClick={handleGo} variant="success" size="lg" disabled={checking}>
-              {checking?<Spinner size={18} color="#fff"/>:"▶"}
-            </Btn>
-          </div>
+          <input
+            value={code}
+            onChange={e=>setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6))}
+            onKeyDown={e=>e.key==="Enter"&&handleGo()}
+            placeholder="XXXXXX"
+            maxLength={6}
+            style={{
+              width:"100%",boxSizing:"border-box",
+              padding:"16px",
+              background:"rgba(255,255,255,.05)",
+              border:"2px solid "+(err?"var(--red)":"var(--border2)"),
+              borderRadius:12,color:"var(--text)",
+              fontSize:24,fontWeight:800,
+              fontFamily:"'JetBrains Mono',monospace",
+              letterSpacing:8,textAlign:"center",
+              outline:"none",transition:"border-color .2s",
+              textTransform:"uppercase",
+              marginBottom:10,
+            }}
+            autoComplete="off"
+            autoCapitalize="characters"
+          />
+          {err&&<Alert type="error">{err}</Alert>}
+          <button
+            onClick={handleGo}
+            disabled={checking}
+            style={{
+              width:"100%",padding:"14px",borderRadius:12,border:"none",
+              background:checking?"rgba(34,197,94,.5)":"linear-gradient(135deg,#22c55e,#16a34a)",
+              color:"#fff",fontSize:16,fontWeight:700,cursor:checking?"not-allowed":"pointer",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+              fontFamily:"'Outfit',sans-serif",boxShadow:"0 4px 18px rgba(34,197,94,.3)",
+              WebkitTapHighlightColor:"transparent",
+            }}
+          >
+            {checking?<Spinner size={18} color="#fff"/>:<>▶ Testni boshlash</>}
+          </button>
         </div>
-        {err&&<Alert type="error">{err}</Alert>}
-        <p style={{color:"var(--text3)",fontSize:12,textAlign:"center",marginTop:6}}>Kodni o'qituvchingizdan oling</p>
+        <p style={{color:"var(--text3)",fontSize:12,textAlign:"center",marginTop:10}}>Kodni o'qituvchingizdan oling</p>
 
         {/* My results */}
         {myResults.length>0&&(
