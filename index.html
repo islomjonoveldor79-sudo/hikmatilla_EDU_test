@@ -164,163 +164,263 @@ const LoadingPage = ({text="Yuklanmoqda..."}) => (
   </div>
 );
 
-// ── GALEREYA (zoom + wheel + drag) ───────────────────────────
+// ── GALEREYA (pinch zoom + 1 barmoq drag) ────────────────────
 const Gallery = ({images=[],fillHeight=false}) => {
   const [idx,setIdx]=useState(0);
   const [open,setOpen]=useState(false);
-  // inline zoom state
   const [scale,setScale]=useState(1);
   const [offset,setOffset]=useState({x:0,y:0});
-  const dragRef=useRef(null);
-  const imgWrapRef=useRef(null);
-  // lightbox zoom
   const [lbScale,setLbScale]=useState(1);
   const [lbOffset,setLbOffset]=useState({x:0,y:0});
-  const lbDragRef=useRef(null);
+
+  const scaleRef=useRef(1);
+  const offsetRef=useRef({x:0,y:0});
+  const lbScaleRef=useRef(1);
+  const lbOffsetRef=useRef({x:0,y:0});
+
+  // Touch refs for inline
+  const touchStateRef=useRef(null); // {type:'pinch'|'drag', ...}
+  // Touch refs for lightbox
+  const lbTouchRef=useRef(null);
+  // Mouse drag refs
+  const mouseDragRef=useRef(null);
+  const lbMouseRef=useRef(null);
 
   const imgs=images.filter(Boolean);
   if(!imgs.length) return null;
 
-  const resetZoom=()=>{setScale(1);setOffset({x:0,y:0});};
-  const resetLbZoom=()=>{setLbScale(1);setLbOffset({x:0,y:0});};
+  const resetZoom=()=>{
+    scaleRef.current=1; offsetRef.current={x:0,y:0};
+    setScale(1); setOffset({x:0,y:0});
+  };
+  const resetLbZoom=()=>{
+    lbScaleRef.current=1; lbOffsetRef.current={x:0,y:0};
+    setLbScale(1); setLbOffset({x:0,y:0});
+  };
 
   const prev=e=>{e.stopPropagation();setIdx(i=>(i-1+imgs.length)%imgs.length);resetZoom();};
   const next=e=>{e.stopPropagation();setIdx(i=>(i+1)%imgs.length);resetZoom();};
   const prevLb=e=>{e.stopPropagation();setIdx(i=>(i-1+imgs.length)%imgs.length);resetLbZoom();};
   const nextLb=e=>{e.stopPropagation();setIdx(i=>(i+1)%imgs.length);resetLbZoom();};
 
-  // Inline wheel zoom
-  const onWheel=e=>{
-    e.preventDefault();
-    const delta=e.deltaY>0?-0.15:0.15;
-    setScale(s=>Math.min(5,Math.max(1,s+delta)));
-    if(scale<=1) setOffset({x:0,y:0});
-  };
-
-  // Inline mouse drag
-  const onMouseDown=e=>{
-    if(scale<=1) return;
-    e.preventDefault();
-    dragRef.current={startX:e.clientX-offset.x,startY:e.clientY-offset.y};
-    const onMove=ev=>{
-      if(!dragRef.current) return;
-      setOffset({x:ev.clientX-dragRef.current.startX,y:ev.clientY-dragRef.current.startY});
-    };
-    const onUp=()=>{dragRef.current=null;window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
-    window.addEventListener("mousemove",onMove);
-    window.addEventListener("mouseup",onUp);
-  };
-
-  // Double-click to reset zoom
-  const onDblClick=()=>{
-    if(scale>1){resetZoom();}else{setScale(2);}
-  };
-
-  // Lightbox wheel zoom
-  const onLbWheel=e=>{
-    e.preventDefault();
-    const delta=e.deltaY>0?-0.2:0.2;
-    setLbScale(s=>Math.min(8,Math.max(1,s+delta)));
-    if(lbScale<=1) setLbOffset({x:0,y:0});
-  };
-
-  // Lightbox drag
-  const onLbMouseDown=e=>{
-    if(lbScale<=1){setOpen(false);return;}
-    e.preventDefault();e.stopPropagation();
-    lbDragRef.current={startX:e.clientX-lbOffset.x,startY:e.clientY-lbOffset.y};
-    const onMove=ev=>{
-      if(!lbDragRef.current) return;
-      setLbOffset({x:ev.clientX-lbDragRef.current.startX,y:ev.clientY-lbDragRef.current.startY});
-    };
-    const onUp=()=>{lbDragRef.current=null;window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
-    window.addEventListener("mousemove",onMove);
-    window.addEventListener("mouseup",onUp);
-  };
-
-  const onLbDblClick=e=>{e.stopPropagation();if(lbScale>1){resetLbZoom();}else{setLbScale(2.5);}};
-
-  // Touch pinch for inline
-  const touchRef=useRef(null);
+  // ── INLINE TOUCH ────────────────────────────────────────────
   const onTouchStart=e=>{
     if(e.touches.length===2){
+      // Pinch boshlash
       const dx=e.touches[0].clientX-e.touches[1].clientX;
       const dy=e.touches[0].clientY-e.touches[1].clientY;
-      touchRef.current={dist:Math.hypot(dx,dy),scale};
+      touchStateRef.current={
+        type:'pinch',
+        startDist:Math.hypot(dx,dy),
+        startScale:scaleRef.current,
+        startOffX:offsetRef.current.x,
+        startOffY:offsetRef.current.y,
+      };
+    } else if(e.touches.length===1){
+      // Drag boshlash (faqat zoom bo'lganda)
+      if(scaleRef.current>1){
+        touchStateRef.current={
+          type:'drag',
+          startX:e.touches[0].clientX - offsetRef.current.x,
+          startY:e.touches[0].clientY - offsetRef.current.y,
+        };
+      } else {
+        touchStateRef.current=null;
+      }
     }
   };
+
   const onTouchMove=e=>{
-    if(e.touches.length===2&&touchRef.current){
+    if(!touchStateRef.current) return;
+    if(touchStateRef.current.type==='pinch' && e.touches.length===2){
       e.preventDefault();
       const dx=e.touches[0].clientX-e.touches[1].clientX;
       const dy=e.touches[0].clientY-e.touches[1].clientY;
       const newDist=Math.hypot(dx,dy);
-      const ratio=newDist/touchRef.current.dist;
-      setScale(Math.min(5,Math.max(1,touchRef.current.scale*ratio)));
+      const ratio=newDist/touchStateRef.current.startDist;
+      const newScale=Math.min(5,Math.max(1,touchStateRef.current.startScale*ratio));
+      scaleRef.current=newScale;
+      if(newScale<=1){offsetRef.current={x:0,y:0};}
+      setScale(newScale);
+      setOffset({...offsetRef.current});
+    } else if(touchStateRef.current.type==='drag' && e.touches.length===1){
+      e.preventDefault();
+      const newX=e.touches[0].clientX - touchStateRef.current.startX;
+      const newY=e.touches[0].clientY - touchStateRef.current.startY;
+      offsetRef.current={x:newX,y:newY};
+      setOffset({x:newX,y:newY});
     }
   };
 
-  const imgH=fillHeight?"100%":"auto";
-  const imgMinH=fillHeight?"0":"220px";
-  const imgMaxH=fillHeight?"100%":"calc(100vh - 220px)";
+  const onTouchEnd=e=>{
+    // Agar zoom 1 ga qaytsa, offset reset
+    if(scaleRef.current<=1){resetZoom();}
+    // 1 barmoqqa o'tganda drag holatiga o'tish
+    if(e.touches.length===1 && touchStateRef.current?.type==='pinch'){
+      if(scaleRef.current>1){
+        touchStateRef.current={
+          type:'drag',
+          startX:e.touches[0].clientX - offsetRef.current.x,
+          startY:e.touches[0].clientY - offsetRef.current.y,
+        };
+      } else {
+        touchStateRef.current=null;
+      }
+    }
+    if(e.touches.length===0) touchStateRef.current=null;
+  };
+
+  const onTap=e=>{
+    // Zoom bo'lganda tap drag uchun, yo'qsa lightbox
+    if(scaleRef.current<=1){setOpen(true);resetLbZoom();}
+  };
+
+  // ── INLINE MOUSE ────────────────────────────────────────────
+  const onWheel=e=>{
+    e.preventDefault();
+    const newScale=Math.min(5,Math.max(1,scaleRef.current+(e.deltaY>0?-0.15:0.15)));
+    scaleRef.current=newScale;
+    if(newScale<=1){offsetRef.current={x:0,y:0};}
+    setScale(newScale); setOffset({...offsetRef.current});
+  };
+  const onMouseDown=e=>{
+    if(scaleRef.current<=1) return;
+    e.preventDefault();
+    mouseDragRef.current={startX:e.clientX-offsetRef.current.x,startY:e.clientY-offsetRef.current.y};
+    const onMove=ev=>{
+      if(!mouseDragRef.current) return;
+      const nx=ev.clientX-mouseDragRef.current.startX;
+      const ny=ev.clientY-mouseDragRef.current.startY;
+      offsetRef.current={x:nx,y:ny};
+      setOffset({x:nx,y:ny});
+    };
+    const onUp=()=>{mouseDragRef.current=null;window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
+    window.addEventListener("mousemove",onMove);
+    window.addEventListener("mouseup",onUp);
+  };
+  const onDblClick=()=>{scale>1?resetZoom():(()=>{scaleRef.current=2.5;setScale(2.5);})();};
+
+  // ── LIGHTBOX TOUCH ──────────────────────────────────────────
+  const onLbTouchStart=e=>{
+    e.stopPropagation();
+    if(e.touches.length===2){
+      const dx=e.touches[0].clientX-e.touches[1].clientX;
+      const dy=e.touches[0].clientY-e.touches[1].clientY;
+      lbTouchRef.current={
+        type:'pinch',
+        startDist:Math.hypot(dx,dy),
+        startScale:lbScaleRef.current,
+      };
+    } else if(e.touches.length===1){
+      if(lbScaleRef.current>1){
+        lbTouchRef.current={
+          type:'drag',
+          startX:e.touches[0].clientX - lbOffsetRef.current.x,
+          startY:e.touches[0].clientY - lbOffsetRef.current.y,
+        };
+      } else { lbTouchRef.current=null; }
+    }
+  };
+  const onLbTouchMove=e=>{
+    e.preventDefault(); e.stopPropagation();
+    if(!lbTouchRef.current) return;
+    if(lbTouchRef.current.type==='pinch' && e.touches.length===2){
+      const dx=e.touches[0].clientX-e.touches[1].clientX;
+      const dy=e.touches[0].clientY-e.touches[1].clientY;
+      const ratio=Math.hypot(dx,dy)/lbTouchRef.current.startDist;
+      const ns=Math.min(8,Math.max(1,lbTouchRef.current.startScale*ratio));
+      lbScaleRef.current=ns;
+      if(ns<=1) lbOffsetRef.current={x:0,y:0};
+      setLbScale(ns); setLbOffset({...lbOffsetRef.current});
+    } else if(lbTouchRef.current.type==='drag' && e.touches.length===1){
+      const nx=e.touches[0].clientX - lbTouchRef.current.startX;
+      const ny=e.touches[0].clientY - lbTouchRef.current.startY;
+      lbOffsetRef.current={x:nx,y:ny};
+      setLbOffset({x:nx,y:ny});
+    }
+  };
+  const onLbTouchEnd=e=>{
+    if(lbScaleRef.current<=1) resetLbZoom();
+    if(e.touches.length===1 && lbTouchRef.current?.type==='pinch'){
+      if(lbScaleRef.current>1){
+        lbTouchRef.current={type:'drag',startX:e.touches[0].clientX-lbOffsetRef.current.x,startY:e.touches[0].clientY-lbOffsetRef.current.y};
+      } else { lbTouchRef.current=null; }
+    }
+    if(e.touches.length===0) lbTouchRef.current=null;
+  };
+
+  // ── LIGHTBOX MOUSE ──────────────────────────────────────────
+  const onLbWheel=e=>{
+    e.preventDefault();
+    const ns=Math.min(8,Math.max(1,lbScaleRef.current+(e.deltaY>0?-0.2:0.2)));
+    lbScaleRef.current=ns;
+    if(ns<=1) lbOffsetRef.current={x:0,y:0};
+    setLbScale(ns); setLbOffset({...lbOffsetRef.current});
+  };
+  const onLbMouseDown=e=>{
+    if(lbScaleRef.current<=1){setOpen(false);return;}
+    e.preventDefault(); e.stopPropagation();
+    lbMouseRef.current={startX:e.clientX-lbOffsetRef.current.x,startY:e.clientY-lbOffsetRef.current.y};
+    const onMove=ev=>{
+      if(!lbMouseRef.current) return;
+      const nx=ev.clientX-lbMouseRef.current.startX;
+      const ny=ev.clientY-lbMouseRef.current.startY;
+      lbOffsetRef.current={x:nx,y:ny};
+      setLbOffset({x:nx,y:ny});
+    };
+    const onUp=()=>{lbMouseRef.current=null;window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
+    window.addEventListener("mousemove",onMove);
+    window.addEventListener("mouseup",onUp);
+  };
+  const onLbDblClick=e=>{e.stopPropagation();lbScaleRef.current>1?resetLbZoom():(()=>{lbScaleRef.current=2.5;setLbScale(2.5);})();};
+
+  const imgMinH=fillHeight?"0":"200px";
+  const imgMaxH=fillHeight?"100%":"55vh";
 
   return (
     <>
       <div className="gallery-wrap" style={{display:"flex",flexDirection:"column",height:fillHeight?"100%":"auto"}}>
-        {/* Image area */}
         <div
           ref={imgWrapRef}
           className="gallery-img-wrap"
-          style={{position:"relative",flex:fillHeight?1:"none",overflow:"hidden",minHeight:imgMinH,maxHeight:imgMaxH,cursor:scale>1?"grab":"zoom-in",userSelect:"none"}}
+          style={{position:"relative",flex:fillHeight?1:"none",overflow:"hidden",minHeight:imgMinH,maxHeight:imgMaxH,userSelect:"none",touchAction:scale>1?"none":"pan-y"}}
           onWheel={onWheel}
           onMouseDown={onMouseDown}
           onDoubleClick={onDblClick}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
-          onClick={scale<=1?()=>{setOpen(true);resetLbZoom();}:undefined}
+          onTouchEnd={onTouchEnd}
+          onClick={scale<=1?onTap:undefined}
         >
           <img
-            src={imgs[idx]}
-            alt={`Rasm ${idx+1}`}
-            className="gallery-img"
+            src={imgs[idx]} alt={`Rasm ${idx+1}`}
             draggable={false}
             style={{
-              width:"100%",
-              height:imgH,
-              objectFit:"contain",
-              display:"block",
-              minHeight:imgMinH,
-              maxHeight:imgMaxH,
+              width:"100%",objectFit:"contain",display:"block",
+              minHeight:imgMinH, maxHeight:imgMaxH,
               transform:`scale(${scale}) translate(${offset.x/scale}px,${offset.y/scale}px)`,
               transition:scale===1?"transform .2s ease":"none",
               cursor:scale>1?"grab":"zoom-in",
+              userSelect:"none",
             }}
           />
-          {/* Nav arrows */}
           {imgs.length>1&&(
             <>
               <button className="gnav" onClick={prev} style={{left:8,position:"absolute",top:"50%",transform:"translateY(-50%)",zIndex:10}}>&#8249;</button>
               <button className="gnav" onClick={next} style={{right:8,position:"absolute",top:"50%",transform:"translateY(-50%)",zIndex:10}}>&#8250;</button>
             </>
           )}
-          {/* Zoom hint */}
-          <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,.65)",borderRadius:6,padding:"3px 9px",fontSize:11,color:"#fff",pointerEvents:"none",zIndex:10,display:"flex",gap:5,alignItems:"center"}}>
-            <span>🖱️</span><span>G'ildirak = zoom · 2×bosish = reset</span>
-          </div>
-          {scale>1&&(
-            <div style={{position:"absolute",top:8,right:8,background:"rgba(59,130,246,.8)",borderRadius:6,padding:"3px 9px",fontSize:11,color:"#fff",pointerEvents:"none",zIndex:10,fontWeight:700}}>
-              {Math.round(scale*100)}%
-            </div>
-          )}
-          {scale===1&&(
-            <div onClick={e=>{e.stopPropagation();setOpen(true);resetLbZoom();}} style={{position:"absolute",bottom:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:6,padding:"3px 9px",fontSize:11,color:"#fff",cursor:"pointer",zIndex:10}}>
-              🔍 To'liq ekran
+          {/* Zoom badge */}
+          {scale>1?(
+            <div style={{position:"absolute",top:8,right:8,background:"rgba(59,130,246,.85)",borderRadius:6,padding:"3px 9px",fontSize:11,color:"#fff",pointerEvents:"none",zIndex:10,fontWeight:700}}>{Math.round(scale*100)}%</div>
+          ):(
+            <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.6)",borderRadius:6,padding:"3px 10px",fontSize:10,color:"rgba(255,255,255,.8)",pointerEvents:"none",zIndex:10,whiteSpace:"nowrap"}}>
+              👆👆 Pinch = zoom · 👆 Drag = siljitish · Tap = to'liq
             </div>
           )}
         </div>
-        {/* Dots */}
         {imgs.length>1&&(
-          <div style={{display:"flex",gap:6,justifyContent:"center",padding:"8px 0",background:"rgba(0,0,0,.35)",flexShrink:0}}>
+          <div style={{display:"flex",gap:6,justifyContent:"center",padding:"7px 0",background:"rgba(0,0,0,.35)",flexShrink:0}}>
             {imgs.map((_,i)=>(
               <button key={i} onClick={()=>{setIdx(i);resetZoom();}} style={{width:i===idx?18:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i===idx?"var(--blue)":"rgba(255,255,255,.3)",transition:"all .2s"}}/>
             ))}
@@ -333,44 +433,39 @@ const Gallery = ({images=[],fillHeight=false}) => {
         <div
           className="lightbox"
           onWheel={onLbWheel}
-          onClick={lbScale<=1?()=>{setOpen(false);resetLbZoom();}:undefined}
+          onTouchStart={onLbTouchStart}
+          onTouchMove={onLbTouchMove}
+          onTouchEnd={onLbTouchEnd}
+          onClick={lbScaleRef.current<=1?()=>{setOpen(false);resetLbZoom();}:undefined}
+          style={{touchAction:"none"}}
         >
-          {/* Close */}
-          <button onClick={()=>{setOpen(false);resetLbZoom();}} style={{position:"absolute",top:14,right:14,width:42,height:42,borderRadius:"50%",background:"var(--red)",border:"none",color:"#fff",fontSize:22,cursor:"pointer",zIndex:1000000,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>×</button>
-          {/* Zoom reset */}
-          {lbScale>1&&<button onClick={e=>{e.stopPropagation();resetLbZoom();}} style={{position:"absolute",top:14,left:14,padding:"6px 14px",borderRadius:8,background:"rgba(59,130,246,.8)",border:"none",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",zIndex:1000000}}>{Math.round(lbScale*100)}% — Reset</button>}
-          {/* Hint */}
-          {lbScale===1&&<div style={{position:"absolute",bottom:16,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.7)",borderRadius:8,padding:"5px 14px",fontSize:12,color:"rgba(255,255,255,.7)",pointerEvents:"none",zIndex:1000000,whiteSpace:"nowrap"}}>🖱️ G'ildirak = zoom · Sichqoncha = sudrab yuring · 2×bosish = kattalashtirish</div>}
-          {/* Nav */}
+          <button onClick={()=>{setOpen(false);resetLbZoom();}} style={{position:"absolute",top:14,right:14,width:44,height:44,borderRadius:"50%",background:"var(--red)",border:"none",color:"#fff",fontSize:22,cursor:"pointer",zIndex:1000000,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          {lbScale>1&&<button onClick={e=>{e.stopPropagation();resetLbZoom();}} style={{position:"absolute",top:14,left:14,padding:"6px 14px",borderRadius:8,background:"rgba(59,130,246,.85)",border:"none",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",zIndex:1000000}}>{Math.round(lbScale*100)}% — Reset</button>}
+          {lbScale===1&&<div style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.7)",borderRadius:8,padding:"5px 14px",fontSize:11,color:"rgba(255,255,255,.75)",pointerEvents:"none",zIndex:1000000,whiteSpace:"nowrap"}}>👆👆 Pinch · 👆 Drag · 2×tap = zoom</div>}
           {imgs.length>1&&(
             <>
               <button className="gnav" onClick={prevLb} style={{left:12,position:"absolute",width:50,height:50,zIndex:1000000}}>&#8249;</button>
               <button className="gnav" onClick={nextLb} style={{right:12,position:"absolute",width:50,height:50,zIndex:1000000}}>&#8250;</button>
             </>
           )}
-          {/* Image */}
           <div
-            className={`lightbox-img-wrap${lbDragRef.current?" dragging":""}`}
+            className="lightbox-img-wrap"
             onMouseDown={onLbMouseDown}
             onDoubleClick={onLbDblClick}
-            style={{cursor:lbScale>1?"grab":"zoom-in"}}
+            style={{cursor:lbScale>1?"grab":"zoom-in",touchAction:"none"}}
           >
             <img
-              src={imgs[idx]}
-              alt="katta"
-              draggable={false}
+              src={imgs[idx]} alt="katta" draggable={false}
               style={{
-                maxWidth:"92vw",maxHeight:"88vh",objectFit:"contain",borderRadius:8,display:"block",
+                maxWidth:"94vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8,display:"block",
                 transform:`scale(${lbScale}) translate(${lbOffset.x/lbScale}px,${lbOffset.y/lbScale}px)`,
                 transition:lbScale===1?"transform .2s":"none",
-                userSelect:"none",pointerEvents:"none",
-                transformOrigin:"center center",
+                userSelect:"none",pointerEvents:"none",transformOrigin:"center center",
               }}
             />
           </div>
-          {/* Dots */}
           {imgs.length>1&&(
-            <div style={{position:"absolute",bottom:50,left:0,right:0,display:"flex",justifyContent:"center",gap:6,zIndex:1000000}}>
+            <div style={{position:"absolute",bottom:52,left:0,right:0,display:"flex",justifyContent:"center",gap:6,zIndex:1000000}}>
               {imgs.map((_,i)=><button key={i} onClick={e=>{e.stopPropagation();setIdx(i);resetLbZoom();}} style={{width:i===idx?18:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i===idx?"var(--blue)":"rgba(255,255,255,.4)",transition:"all .2s"}}/>)}
             </div>
           )}
@@ -1042,13 +1137,16 @@ const TestPage = ({profile,test,attemptNumber,onFinish}) => {
   );
 
   const AnswerCard=()=>(
-    <Card style={{padding:20,marginBottom:14}}>
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
-        <div style={{width:44,height:44,borderRadius:12,background:"linear-gradient(135deg,var(--blue),var(--purple))",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:18,flexShrink:0}}>{currentQ}</div>
-        <div><p style={{color:"var(--text)",fontWeight:700,fontSize:16}}>{currentQ}-savol javobi</p><p style={{color:"var(--text3)",fontSize:12}}>To'g'ri javob harfini tanlang</p></div>
+    <Card style={{padding:"14px 16px",marginBottom:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,var(--blue),var(--purple))",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:16,flexShrink:0}}>{currentQ}</div>
+        <div>
+          <p style={{color:"var(--text)",fontWeight:700,fontSize:15}}>{currentQ}-savol javobi</p>
+          <p style={{color:"var(--text3)",fontSize:11}}>To'g'ri harfni tanlang</p>
+        </div>
       </div>
       <AnswerPicker size="lg" value={answers[currentQ]||null} onChange={l=>pick(currentQ,l)}/>
-      {answers[currentQ]&&<div style={{marginTop:14,padding:"10px 14px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.2)",borderRadius:10}}><span style={{color:"var(--green)",fontSize:14,fontWeight:600}}>✓ {currentQ}-savol: <strong>{answers[currentQ]}</strong></span></div>}
+      {answers[currentQ]&&<div style={{marginTop:12,padding:"8px 12px",background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.2)",borderRadius:8}}><span style={{color:"var(--green)",fontSize:13,fontWeight:600}}>✓ {currentQ}-savol: <strong>{answers[currentQ]}</strong></span></div>}
     </Card>
   );
 
@@ -1085,13 +1183,17 @@ const TestPage = ({profile,test,attemptNumber,onFinish}) => {
       </div>
 
       {/* STAT BADGES */}
-      <div style={{display:"flex",gap:8,padding:"10px 14px",flexShrink:0,borderBottom:"1px solid var(--border)"}}>
-        {[{v:answered,c:"var(--green)",bg:"rgba(34,197,94,.08)",l:"Javob berildi"},{v:test.question_count-answered,c:"var(--red)",bg:"rgba(239,68,68,.06)",l:"Qoldi"},{v:test.question_count,c:"var(--blue)",bg:"rgba(59,130,246,.08)",l:"Jami"}].map(s=>(
-          <div key={s.l} style={{flex:1,background:s.bg,borderRadius:10,padding:"7px 4px",textAlign:"center",border:`1px solid ${s.c}22`}}>
-            <div style={{color:s.c,fontWeight:800,fontSize:18,lineHeight:1}}>{s.v}</div>
-            <div style={{color:"var(--text3)",fontSize:10,marginTop:2}}>{s.l}</div>
+      <div style={{display:"flex",gap:6,padding:"8px 12px",flexShrink:0,borderBottom:"1px solid var(--border)"}}>
+        {[{v:answered,c:"var(--green)",bg:"rgba(34,197,94,.08)",l:"Javob"},{v:test.question_count-answered,c:"var(--red)",bg:"rgba(239,68,68,.06)",l:"Qoldi"},{v:test.question_count,c:"var(--blue)",bg:"rgba(59,130,246,.08)",l:"Jami"}].map(s=>(
+          <div key={s.l} style={{flex:1,background:s.bg,borderRadius:8,padding:"6px 4px",textAlign:"center",border:`1px solid ${s.c}22`}}>
+            <div style={{color:s.c,fontWeight:800,fontSize:16,lineHeight:1}}>{s.v}</div>
+            <div style={{color:"var(--text3)",fontSize:10,marginTop:1}}>{s.l}</div>
           </div>
         ))}
+        {/* Mini progress indicator on mobile */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,.04)",borderRadius:8,padding:"4px 10px",border:"1px solid var(--border)",minWidth:52}}>
+          <span style={{fontSize:11,fontWeight:700,color:"var(--text2)"}}>{answered}/{test.question_count}</span>
+        </div>
       </div>
 
       {/* MAIN CONTENT */}
@@ -1110,12 +1212,19 @@ const TestPage = ({profile,test,attemptNumber,onFinish}) => {
           </div>
         </div>
       ):(
-        /* MOBILE: stacked, scrollable */
-        <div style={{flex:1,overflowY:"auto",padding:"12px 12px 32px",WebkitOverflowScrolling:"touch"}}>
-          {imgs.length>0&&<div style={{marginBottom:12}}><Gallery images={imgs}/></div>}
-          <QuestionNav/>
-          <AnswerCard/>
-          <NavBtns/>
+        /* MOBILE: compact, no QuestionNav grid */
+        <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+          {/* Rasm */}
+          {imgs.length>0&&(
+            <div style={{marginBottom:0}}>
+              <Gallery images={imgs}/>
+            </div>
+          )}
+          {/* Savol va javob */}
+          <div style={{padding:"10px 12px 24px"}}>
+            <AnswerCard/>
+            <NavBtns/>
+          </div>
         </div>
       )}
     </div>
