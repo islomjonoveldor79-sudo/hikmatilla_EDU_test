@@ -769,7 +769,9 @@ const TeacherPanel = ({profile,onLogout}) => {
       const {error}=await sb.storage.from("test-images").upload(path,file);
       if(!error){const {data:p}=sb.storage.from("test-images").getPublicUrl(path);image_urls.push(p.publicUrl);}
     }
-    const {error}=await sb.from("tests").insert({title,teacher_id:profile.id,time_limit:timeLimit,question_count:qCount,answer_key:answerKey,image_urls:image_urls.length?image_urls:null,active:false});
+    const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let access_code="";for(let i=0;i<6;i++)access_code+=chars[Math.floor(Math.random()*chars.length)];
+    const {error}=await sb.from("tests").insert({title,teacher_id:profile.id,time_limit:timeLimit,question_count:qCount,answer_key:answerKey,image_urls:image_urls.length?image_urls:null,active:false,access_code});
     if(error) alert("Xato: "+error.message);
     else{setTitle("");setTimeLimit(20);setQCount(10);setAnswerKey({});setImgFiles([]);setImgPreviews([]);setBuilding(false);await loadData();setTab("manage");}
     setSaving(false);
@@ -876,6 +878,13 @@ const TeacherPanel = ({profile,onLogout}) => {
                         <span style={{color:"var(--text3)",fontSize:12}}>{t.question_count} savol · {t.time_limit} min</span>
                         {imgs.length>1&&<span style={{color:"var(--yellow)",fontSize:12}}>🖼 {imgs.length} rasm</span>}
                       </div>
+                      {t.access_code&&(
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}>
+                          <span style={{fontSize:11,color:"var(--text3)"}}>🔑 Kod:</span>
+                          <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:800,color:"var(--blue)",letterSpacing:2}}>{t.access_code}</span>
+                          <button onClick={()=>{navigator.clipboard.writeText(t.access_code);}} style={{padding:"2px 8px",borderRadius:6,border:"1px solid var(--blue)",background:"transparent",color:"var(--blue)",fontSize:11,cursor:"pointer",fontWeight:600}}>Nusxa</button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div style={{display:"flex",gap:8}}>
@@ -975,68 +984,98 @@ const TeacherPanel = ({profile,onLogout}) => {
 
 // ── O'QUVCHI ENTRY ────────────────────────────────────────────
 const StudentEntry = ({profile,onStart,onLogout}) => {
-  const [tests,setTests]=useState([]);
+  const [code,setCode]=useState("");
   const [myResults,setMyRes]=useState([]);
-  const [selId,setSelId]=useState("");
   const [loading,setLoading]=useState(true);
+  const [checking,setChecking]=useState(false);
   const [err,setErr]=useState("");
+  const [copied,setCopied]=useState(false);
 
   useEffect(()=>{
-    const load=async()=>{
-      const {data:t}=await sb.from("tests").select("*").eq("active",true).order("created_at",{ascending:false});
-      const {data:r}=await sb.from("results").select("*").eq("student_id",profile.id);
-      setTests(t||[]);setMyRes(r||[]);setLoading(false);
-    };
-    load();
+    sb.from("results").select("*").eq("student_id",profile.id).then(({data})=>{
+      setMyRes(data||[]);setLoading(false);
+    });
   },[profile.id]);
 
-  const go=()=>{
-    setErr("");
-    if(!selId) return setErr("Test tanlang!");
-    const test=tests.find(t=>t.id===selId);
-    if(!test) return setErr("Test topilmadi!");
+  const handleGo=async()=>{
+    const c=code.trim().toUpperCase();
+    if(!c) return setErr("Kodni kiriting!");
+    setErr("");setChecking(true);
+    const {data:tests}=await sb.from("tests").select("*").eq("access_code",c).eq("active",true);
+    setChecking(false);
+    if(!tests||!tests.length) return setErr("Kod noto'g'ri yoki test faol emas!");
+    const test=tests[0];
     const done=myResults.filter(r=>r.test_id===test.id);
-    if(done.length>=2) return setErr("Siz bu testni 2 marta ishladingiz!");
+    if(done.length>=2) return setErr("Siz bu testni allaqachon 2 marta ishladingiz!");
     if(done.length===1&&!done[0].can_retry) return setErr("2-urinish uchun o'qituvchingizdan ruxsat oling!");
     onStart({test,attemptNumber:done.length+1});
   };
 
-  if(loading) return <LoadingPage text="Testlar yuklanmoqda..."/>;
+  const gradeColor=g=>g==="A"?"var(--green)":g==="B"?"var(--blue)":g==="C"?"var(--yellow)":"var(--red)";
+
+  if(loading) return <LoadingPage text="Yuklanmoqda..."/>;
   return (
-    <div className="fade" style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"radial-gradient(ellipse at 20% 80%,rgba(34,197,94,.08) 0%,transparent 50%),var(--bg)"}}>
-      <Card style={{width:"100%",maxWidth:440,padding:28}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-          <div><div style={{fontSize:24,marginBottom:4}}>👨‍🎓</div><h2 style={{fontSize:18,fontWeight:800,color:"var(--text)"}}>Salom, {profile.full_name.split(" ")[0]}!</h2></div>
+    <div className="fade" style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,background:"radial-gradient(ellipse at 20% 80%,rgba(59,130,246,.08) 0%,transparent 50%),var(--bg)"}}>
+      <Card style={{width:"100%",maxWidth:420,padding:28}}>
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:28}}>
+          <div>
+            <div style={{fontSize:28,marginBottom:4}}>👨‍🎓</div>
+            <h2 style={{fontSize:18,fontWeight:800,color:"var(--text)"}}>Salom, {profile.full_name.split(" ")[0]}!</h2>
+            <p style={{color:"var(--text3)",fontSize:12,marginTop:2}}>Test kodini kiriting</p>
+          </div>
           <Btn onClick={onLogout} variant="ghost" size="sm">↩ Chiqish</Btn>
         </div>
-        <div style={{marginBottom:16}}>
-          <label style={{display:"block",fontSize:12,color:"var(--text2)",marginBottom:8,fontWeight:700,textTransform:"uppercase"}}>Test tanlang</label>
-          <select value={selId} onChange={e=>setSelId(e.target.value)} style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",border:"1px solid var(--border2)",borderRadius:10,color:"var(--text)",fontSize:15,outline:"none"}}>
-            <option value="">-- Test tanlang --</option>
-            {tests.map(t=>{
-              const done=myResults.filter(r=>r.test_id===t.id);
-              const blocked=done.length===1&&!done[0].can_retry;
-              return <option key={t.id} value={t.id} style={{background:"#1e293b"}}>{blocked?"🔒":"✅"} {t.title} ({t.question_count} savol){done.length>0?` [${done.length}/2]`:""}</option>;
-            })}
-          </select>
-          {!tests.length&&<p style={{color:"var(--yellow)",fontSize:12,marginTop:6}}>⚠ Hozircha faol test yo'q</p>}
+
+        {/* Code input */}
+        <div style={{marginBottom:8}}>
+          <label style={{display:"block",fontSize:11,color:"var(--text2)",fontWeight:700,textTransform:"uppercase",marginBottom:8,letterSpacing:.5}}>🔑 Test kodi</label>
+          <div style={{display:"flex",gap:8}}>
+            <input
+              value={code}
+              onChange={e=>setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6))}
+              onKeyDown={e=>e.key==="Enter"&&handleGo()}
+              placeholder="XXXXXX"
+              maxLength={6}
+              style={{
+                flex:1,padding:"14px 16px",
+                background:"rgba(255,255,255,.05)",
+                border:"2px solid "+(err?"var(--red)":"var(--border2)"),
+                borderRadius:12,color:"var(--text)",
+                fontSize:22,fontWeight:800,
+                fontFamily:"'JetBrains Mono',monospace",
+                letterSpacing:6,textAlign:"center",
+                outline:"none",transition:"border-color .2s",
+                textTransform:"uppercase",
+              }}
+              autoComplete="off"
+              autoCapitalize="characters"
+            />
+            <Btn onClick={handleGo} variant="success" size="lg" disabled={checking}>
+              {checking?<Spinner size={18} color="#fff"/>:"▶"}
+            </Btn>
+          </div>
         </div>
         {err&&<Alert type="error">{err}</Alert>}
-        <Btn onClick={go} variant="success" full size="lg">Testni boshlash ▶</Btn>
+        <p style={{color:"var(--text3)",fontSize:12,textAlign:"center",marginTop:6}}>Kodni o'qituvchingizdan oling</p>
+
+        {/* My results */}
         {myResults.length>0&&(
-          <div style={{marginTop:20}}>
-            <p style={{color:"var(--text2)",fontSize:12,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Mening natijalarim</p>
-            {myResults.slice().reverse().map(r=>{
-              const g=getGrade(r.score,r.total);const t=tests.find(x=>x.id===r.test_id);
+          <div style={{marginTop:24}}>
+            <p style={{color:"var(--text2)",fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:10,letterSpacing:.5}}>Mening natijalarim</p>
+            {myResults.slice().reverse().slice(0,5).map(r=>{
+              const g=getGrade(r.score,r.total);
               return (
-                <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,.03)",borderRadius:10,padding:"10px 12px",marginBottom:6}}>
+                <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,.03)",borderRadius:10,padding:"10px 12px",marginBottom:6,border:"1px solid rgba(255,255,255,.05)"}}>
                   <div>
-                    <div style={{color:"var(--text)",fontSize:13,fontWeight:600}}>{t?.title||"Test"}</div>
+                    <div style={{color:"var(--text)",fontSize:13,fontWeight:600}}>
+                      {r.test_title||"Test"}
+                    </div>
                     <div style={{color:"var(--text3)",fontSize:11}}>{r.attempt_number}-urinish</div>
                   </div>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                    <span style={{color:"var(--text2)",fontSize:13}}>{r.score}/{r.total}</span>
-                    <span style={{background:gradeColor(g)+"22",color:gradeColor(g),border:`1px solid ${gradeColor(g)}44`,borderRadius:8,padding:"2px 10px",fontWeight:800}}>{g}</span>
+                    <span style={{color:"var(--text2)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{r.score}/{r.total}</span>
+                    <span style={{background:gradeColor(g)+"22",color:gradeColor(g),border:`1px solid ${gradeColor(g)}44`,borderRadius:8,padding:"2px 10px",fontWeight:800,fontSize:13}}>{g}</span>
                   </div>
                 </div>
               );
@@ -1429,7 +1468,8 @@ function App() {
     await sb.from("results").insert({
       student_id:profile.id,test_id:test.id,score,total,percent,grade,
       time_taken:timeTaken,answers,attempt_number:attemptNumber,
-      can_retry:false,finished_at:new Date().toISOString()
+      can_retry:false,finished_at:new Date().toISOString(),
+      test_title:test.title
     });
     setLastResult({answers,score,timeTaken,test});
     setSession(null);
