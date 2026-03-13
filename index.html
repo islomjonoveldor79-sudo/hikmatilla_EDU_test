@@ -475,21 +475,6 @@ const LoginPage = ({onSwitchToRegister}) => {
             <p className="auth-card-sub">Hisobingizga kiring</p>
           </div>
 
-          {form.role==="teacher"&&(
-            <div style={{marginBottom:18}}>
-              <label style={{display:"block",fontSize:13,color:"var(--text2)",marginBottom:7,fontWeight:600}}>🔑 O'qituvchi kodi</label>
-              <input
-                type="password"
-                value={teacherCode}
-                onChange={e=>setTeacherCode(e.target.value)}
-                placeholder="Administratordan oling"
-                style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",border:`1px solid ${err&&!teacherCode?"var(--red)":"rgba(255,255,255,.12)"}`,borderRadius:10,color:"var(--text)",fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"'Outfit',sans-serif"}}
-                autoComplete="off"
-              />
-              <p style={{fontSize:11,color:"var(--text3)",marginTop:5}}>⚠ Hisobingiz admin tomonidan tasdiqlanadi</p>
-            </div>
-          )}
-
           <FormInput
             label="📧 Email"
             type="email"
@@ -639,6 +624,21 @@ const RegisterPage = ({onSwitchToLogin}) => {
               ))}
             </div>
           </div>
+
+          {form.role==="teacher"&&(
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,color:"var(--text2)",marginBottom:7,fontWeight:600}}>🔑 O'qituvchi kodi</label>
+              <input
+                type="password"
+                value={teacherCode}
+                onChange={e=>setTeacherCode(e.target.value)}
+                placeholder="Administratordan oling"
+                style={{width:"100%",padding:"12px 14px",background:"rgba(255,255,255,.04)",border:`1px solid rgba(255,255,255,.12)`,borderRadius:10,color:"var(--text)",fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"'Outfit',sans-serif"}}
+                autoComplete="off"
+              />
+              <p style={{fontSize:11,color:"var(--yellow)",marginTop:5}}>⚠ Tasdiqlash uchun admin bilan bog'laning</p>
+            </div>
+          )}
 
           <FormInput
             label="📧 Email"
@@ -1320,6 +1320,7 @@ const AdminPanel = ({profile,onLogout}) => {
   const [tests,setTests]=useState([]);
   const [loading,setLoading]=useState(true);
   const [userTab,setUserTab]=useState("teachers");
+  const [deleteConfirm,setDeleteConfirm]=useState(null);
 
   const loadData=useCallback(async()=>{
     const {data:u}=await sb.from("profiles").select("*").order("created_at",{ascending:false});
@@ -1334,6 +1335,12 @@ const AdminPanel = ({profile,onLogout}) => {
     await loadData();
   };
 
+  const deleteTeacher=async(id)=>{
+    await sb.from("profiles").delete().eq("id",id);
+    setDeleteConfirm(null);
+    await loadData();
+  };
+
   if(loading) return <LoadingPage/>;
   const teachers=users.filter(u=>u.role==="teacher");
   const students=users.filter(u=>u.role==="student");
@@ -1341,6 +1348,8 @@ const AdminPanel = ({profile,onLogout}) => {
 
   return (
     <div style={{minHeight:"100vh",background:"var(--bg)",paddingBottom:72}}>
+      {deleteConfirm&&<ConfirmModal message={`"${deleteConfirm.name}" o'qituvchisini o'chirasizmi?
+Bu amalni ortga qaytarib bo'lmaydi!`} onConfirm={()=>deleteTeacher(deleteConfirm.id)} onCancel={()=>setDeleteConfirm(null)} danger={true}/>}
       <div style={{background:"rgba(255,255,255,.02)",borderBottom:"1px solid var(--border)",padding:"0 16px",height:52,position:"sticky",top:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:20}}>🎓</span><span style={{fontWeight:800,fontSize:16,color:"var(--text)"}}>Testlyy</span><Badge color="var(--purple)">Admin</Badge></div>
         <Btn onClick={onLogout} variant="ghost" size="sm">↩ Chiqish</Btn>
@@ -1395,13 +1404,14 @@ const AdminPanel = ({profile,onLogout}) => {
                           {isActive&&<span style={{background:"rgba(34,197,94,.1)",color:"var(--green)",border:"1px solid rgba(34,197,94,.3)",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>✅ Faol</span>}
                         </div>
                       </div>
-                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
                         {(isPending||isBlocked)&&(
                           <button onClick={()=>updateTeacherStatus(u.id,"active")} style={{padding:"7px 12px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#22c55e,#16a34a)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>✅ Tasdiqlash</button>
                         )}
                         {!isBlocked&&(
-                          <button onClick={()=>updateTeacherStatus(u.id,"blocked")} style={{padding:"7px 12px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>🚫 Bloklash</button>
+                          <button onClick={()=>updateTeacherStatus(u.id,"blocked")} style={{padding:"7px 12px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>🚫 Bloklash</button>
                         )}
+                        <button onClick={()=>setDeleteConfirm({id:u.id,name:u.full_name})} style={{padding:"7px 12px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>🗑 O'chirish</button>
                       </div>
                     </Card>
                   );
