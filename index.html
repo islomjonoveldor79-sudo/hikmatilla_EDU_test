@@ -1543,18 +1543,22 @@ function App() {
 
   const handleStart=({test,attemptNumber})=>{setLastResult(null);setSession({test,attemptNumber});};
 
-  const handleFinish=async({answers,score,timeTaken,attemptNumber})=>{
-    const test=session.test;
-    const total=test.question_count;
-    const percent=Math.round((score/total)*100);
-    const grade=getGrade(score,total);
-    await sb.from("results").insert({
-      student_id:profile.id,test_id:test.id,score,total,percent,grade,
-      time_taken:timeTaken,answers,attempt_number:attemptNumber,
-      can_retry:false,finished_at:new Date().toISOString(),
-      test_title:test.title
+  const handleFinish = async ({answers, timeTaken, attemptNumber}) => {
+    const test = session.test;
+    const {data, error} = await sb.rpc('submit_answers', {
+      p_test_id: test.id,
+      p_student_id: profile.id,
+      p_answers: answers,
+      p_time_taken: timeTaken,
+      p_attempt_number: attemptNumber
     });
-    setLastResult({answers,score,timeTaken,test});
+    if(error){alert("Xato: " + error.message); return;}
+    setLastResult({
+      answers,
+      score: data.score,
+      timeTaken,
+      test: {...test, answer_key: data.answer_key}
+    });
     setSession(null);
   };
 
