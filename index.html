@@ -528,7 +528,7 @@ const LoginPage = ({onSwitchToRegister}) => {
 };
 
 // ── RO'YXATDAN O'TISH SAHIFASI ────────────────────────────────
-const TEACHER_SECRET = "hell0_nimda";
+
 
 const RegisterPage = ({onSwitchToLogin}) => {
   const [form,setForm]=useState({full_name:"",email:"",password:"",role:"student"});
@@ -541,9 +541,15 @@ const RegisterPage = ({onSwitchToLogin}) => {
     setErr("");
     if(!form.full_name.trim()||!form.email||!form.password) return setErr("Barcha maydonlarni to\'ldiring!");
     if(form.password.length<6) return setErr("Parol kamida 6 ta belgi bo\'lsin!");
-    if(form.role==="teacher"){
-      if(!teacherCode.trim()) return setErr("O\'qituvchi kodini kiriting!");
-      if(teacherCode.trim()!==TEACHER_SECRET) return setErr("O\'qituvchi kodi noto\'g\'ri!");
+    if(form.role === "teacher") {
+      if(!teacherCode.trim()) return setErr("O'qituvchi kodini kiriting!");
+  
+      // Bazadan tekshiramiz — parol hech qachon frontendga kelmaydi
+      const { data: isValid } = await sb.rpc('verify_teacher_code', {
+        input_code: teacherCode.trim()
+      });
+  
+      if(!isValid) return setErr("O'qituvchi kodi noto'g'ri!");
     }
     setLoading(true);
     const status=form.role==="teacher"?"pending":"active";
