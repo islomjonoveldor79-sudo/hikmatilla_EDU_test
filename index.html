@@ -164,265 +164,236 @@ const LoadingPage = ({text="Yuklanmoqda..."}) => (
   </div>
 );
 
-// ── GALEREYA (pinch zoom + 1 barmoq drag) ────────────────────
+// ── GALEREYA ─────────────────────────────────────────────────
 const Gallery = ({images=[],fillHeight=false}) => {
-  const [idx,setIdx]=useState(0);
-  const [open,setOpen]=useState(false);
-  const [scale,setScale]=useState(1);
-  const [offset,setOffset]=useState({x:0,y:0});
-  const [lbScale,setLbScale]=useState(1);
-  const [lbOffset,setLbOffset]=useState({x:0,y:0});
+  const imgs=(images||[]).filter(Boolean);
 
-  const scaleRef=useRef(1);
-  const offsetRef=useRef({x:0,y:0});
-  const lbScaleRef=useRef(1);
-  const lbOffsetRef=useRef({x:0,y:0});
+  const [idx,setIdx]    = useState(0);
+  const [open,setOpen]  = useState(false);
+  const [scale,setScale]= useState(1);
+  const [offset,setOffset]= useState({x:0,y:0});
+  const [lbScale,setLbScale]= useState(1);
+  const [lbOffset,setLbOffset]= useState({x:0,y:0});
 
-  // Touch refs for inline
-  const touchStateRef=useRef(null); // {type:'pinch'|'drag', ...}
-  // Touch refs for lightbox
-  const lbTouchRef=useRef(null);
-  // Mouse drag refs
-  const mouseDragRef=useRef(null);
-  const lbMouseRef=useRef(null);
+  const wrapRef   = useRef(null);
+  const lbWrapRef = useRef(null);
 
-  const imgs=images.filter(Boolean);
+  // mutable refs (no re-render needed)
+  const S   = useRef({scale:1, ox:0, oy:0});
+  const LB  = useRef({scale:1, ox:0, oy:0});
+  const drag= useRef(null); // {type,sx,sy} or {type:'pinch',d0,s0}
+
+  // ── helper ──
+  const applyS =()=>{ setScale(S.current.scale);  setOffset({x:S.current.ox,  y:S.current.oy});  };
+  const applyLB=()=>{ setLbScale(LB.current.scale);setLbOffset({x:LB.current.ox,y:LB.current.oy});};
+  const resetS =()=>{ S.current={scale:1,ox:0,oy:0};  applyS();  };
+  const resetLB=()=>{ LB.current={scale:1,ox:0,oy:0}; applyLB(); };
+
+  const goTo=(i)=>{ setIdx(i); resetS(); };
+  const goToLb=(i)=>{ setIdx(i); resetLB(); };
+
+  // ── non-passive touch listeners on inline wrap ──
+  useEffect(()=>{
+    const el=wrapRef.current;
+    if(!el||!imgs.length) return;
+
+    const onStart=(e)=>{
+      if(e.touches.length===2){
+        const dx=e.touches[0].clientX-e.touches[1].clientX;
+        const dy=e.touches[0].clientY-e.touches[1].clientY;
+        drag.current={type:'pinch',d0:Math.hypot(dx,dy),s0:S.current.scale};
+        e.preventDefault();
+      } else if(e.touches.length===1 && S.current.scale>1){
+        drag.current={type:'drag',
+          sx:e.touches[0].clientX - S.current.ox,
+          sy:e.touches[0].clientY - S.current.oy};
+        e.preventDefault();
+      } else {
+        drag.current=null;
+      }
+    };
+
+    const onMove=(e)=>{
+      if(!drag.current) return;
+      e.preventDefault();
+      if(drag.current.type==='pinch' && e.touches.length===2){
+        const dx=e.touches[0].clientX-e.touches[1].clientX;
+        const dy=e.touches[0].clientY-e.touches[1].clientY;
+        const ns=Math.min(5,Math.max(1,drag.current.s0*(Math.hypot(dx,dy)/drag.current.d0)));
+        S.current.scale=ns;
+        if(ns<=1){S.current.ox=0;S.current.oy=0;}
+        applyS();
+      } else if(drag.current.type==='drag' && e.touches.length===1){
+        S.current.ox=e.touches[0].clientX-drag.current.sx;
+        S.current.oy=e.touches[0].clientY-drag.current.sy;
+        applyS();
+      }
+    };
+
+    const onEnd=(e)=>{
+      if(S.current.scale<=1) resetS();
+      // pinch → drag geçişi
+      if(e.touches.length===1 && drag.current?.type==='pinch' && S.current.scale>1){
+        drag.current={type:'drag',
+          sx:e.touches[0].clientX - S.current.ox,
+          sy:e.touches[0].clientY - S.current.oy};
+      } else if(e.touches.length===0){
+        drag.current=null;
+      }
+    };
+
+    const onWheel=(e)=>{
+      e.preventDefault();
+      const ns=Math.min(5,Math.max(1, S.current.scale+(e.deltaY>0?-0.15:0.15)));
+      S.current.scale=ns;
+      if(ns<=1){S.current.ox=0;S.current.oy=0;}
+      applyS();
+    };
+
+    el.addEventListener('touchstart',onStart,{passive:false});
+    el.addEventListener('touchmove', onMove, {passive:false});
+    el.addEventListener('touchend',  onEnd,  {passive:true});
+    el.addEventListener('wheel',     onWheel,{passive:false});
+    return()=>{
+      el.removeEventListener('touchstart',onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend',  onEnd);
+      el.removeEventListener('wheel',     onWheel);
+    };
+  },[imgs.length]);
+
+  // ── non-passive touch on lightbox ──
+  useEffect(()=>{
+    const el=lbWrapRef.current;
+    if(!el||!open) return;
+
+    const onStart=(e)=>{
+      e.stopPropagation();
+      if(e.touches.length===2){
+        const dx=e.touches[0].clientX-e.touches[1].clientX;
+        const dy=e.touches[0].clientY-e.touches[1].clientY;
+        drag.current={type:'lbpinch',d0:Math.hypot(dx,dy),s0:LB.current.scale};
+        e.preventDefault();
+      } else if(e.touches.length===1 && LB.current.scale>1){
+        drag.current={type:'lbdrag',
+          sx:e.touches[0].clientX-LB.current.ox,
+          sy:e.touches[0].clientY-LB.current.oy};
+        e.preventDefault();
+      } else { drag.current=null; }
+    };
+    const onMove=(e)=>{
+      if(!drag.current) return;
+      e.preventDefault(); e.stopPropagation();
+      if(drag.current.type==='lbpinch' && e.touches.length===2){
+        const dx=e.touches[0].clientX-e.touches[1].clientX;
+        const dy=e.touches[0].clientY-e.touches[1].clientY;
+        const ns=Math.min(8,Math.max(1,drag.current.s0*(Math.hypot(dx,dy)/drag.current.d0)));
+        LB.current.scale=ns;
+        if(ns<=1){LB.current.ox=0;LB.current.oy=0;}
+        applyLB();
+      } else if(drag.current.type==='lbdrag' && e.touches.length===1){
+        LB.current.ox=e.touches[0].clientX-drag.current.sx;
+        LB.current.oy=e.touches[0].clientY-drag.current.sy;
+        applyLB();
+      }
+    };
+    const onEnd=(e)=>{
+      if(LB.current.scale<=1) resetLB();
+      if(e.touches.length===1 && drag.current?.type==='lbpinch' && LB.current.scale>1){
+        drag.current={type:'lbdrag',sx:e.touches[0].clientX-LB.current.ox,sy:e.touches[0].clientY-LB.current.oy};
+      } else if(e.touches.length===0){ drag.current=null; }
+    };
+    const onWheel=(e)=>{
+      e.preventDefault();
+      const ns=Math.min(8,Math.max(1,LB.current.scale+(e.deltaY>0?-0.2:0.2)));
+      LB.current.scale=ns;
+      if(ns<=1){LB.current.ox=0;LB.current.oy=0;}
+      applyLB();
+    };
+
+    el.addEventListener('touchstart',onStart,{passive:false});
+    el.addEventListener('touchmove', onMove, {passive:false});
+    el.addEventListener('touchend',  onEnd,  {passive:true});
+    el.addEventListener('wheel',     onWheel,{passive:false});
+    return()=>{
+      el.removeEventListener('touchstart',onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend',  onEnd);
+      el.removeEventListener('wheel',     onWheel);
+    };
+  },[open]);
+
+  // ── mouse handlers (desktop) ──
+  const onMouseDown=useCallback((e)=>{
+    if(S.current.scale<=1) return;
+    e.preventDefault();
+    const sx=e.clientX-S.current.ox, sy=e.clientY-S.current.oy;
+    const onMove=(ev)=>{S.current.ox=ev.clientX-sx;S.current.oy=ev.clientY-sy;applyS();};
+    const onUp=()=>{window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);};
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  },[]);
+
+  const onLbMouseDown=useCallback((e)=>{
+    if(LB.current.scale<=1){setOpen(false);resetLB();return;}
+    e.preventDefault();e.stopPropagation();
+    const sx=e.clientX-LB.current.ox, sy=e.clientY-LB.current.oy;
+    const onMove=(ev)=>{LB.current.ox=ev.clientX-sx;LB.current.oy=ev.clientY-sy;applyLB();};
+    const onUp=()=>{window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);};
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  },[]);
+
+  const onDblClick=()=>{ S.current.scale>1?resetS():(()=>{S.current.scale=2.5;applyS();})(); };
+  const onLbDblClick=(e)=>{ e.stopPropagation(); LB.current.scale>1?resetLB():(()=>{LB.current.scale=2.5;applyLB();})(); };
+
   if(!imgs.length) return null;
 
-  const resetZoom=()=>{
-    scaleRef.current=1; offsetRef.current={x:0,y:0};
-    setScale(1); setOffset({x:0,y:0});
-  };
-  const resetLbZoom=()=>{
-    lbScaleRef.current=1; lbOffsetRef.current={x:0,y:0};
-    setLbScale(1); setLbOffset({x:0,y:0});
-  };
-
-  const prev=e=>{e.stopPropagation();setIdx(i=>(i-1+imgs.length)%imgs.length);resetZoom();};
-  const next=e=>{e.stopPropagation();setIdx(i=>(i+1)%imgs.length);resetZoom();};
-  const prevLb=e=>{e.stopPropagation();setIdx(i=>(i-1+imgs.length)%imgs.length);resetLbZoom();};
-  const nextLb=e=>{e.stopPropagation();setIdx(i=>(i+1)%imgs.length);resetLbZoom();};
-
-  // ── INLINE TOUCH ────────────────────────────────────────────
-  const onTouchStart=e=>{
-    if(e.touches.length===2){
-      // Pinch boshlash
-      const dx=e.touches[0].clientX-e.touches[1].clientX;
-      const dy=e.touches[0].clientY-e.touches[1].clientY;
-      touchStateRef.current={
-        type:'pinch',
-        startDist:Math.hypot(dx,dy),
-        startScale:scaleRef.current,
-        startOffX:offsetRef.current.x,
-        startOffY:offsetRef.current.y,
-      };
-    } else if(e.touches.length===1){
-      // Drag boshlash (faqat zoom bo'lganda)
-      if(scaleRef.current>1){
-        touchStateRef.current={
-          type:'drag',
-          startX:e.touches[0].clientX - offsetRef.current.x,
-          startY:e.touches[0].clientY - offsetRef.current.y,
-        };
-      } else {
-        touchStateRef.current=null;
-      }
-    }
-  };
-
-  const onTouchMove=e=>{
-    if(!touchStateRef.current) return;
-    if(touchStateRef.current.type==='pinch' && e.touches.length===2){
-      e.preventDefault();
-      const dx=e.touches[0].clientX-e.touches[1].clientX;
-      const dy=e.touches[0].clientY-e.touches[1].clientY;
-      const newDist=Math.hypot(dx,dy);
-      const ratio=newDist/touchStateRef.current.startDist;
-      const newScale=Math.min(5,Math.max(1,touchStateRef.current.startScale*ratio));
-      scaleRef.current=newScale;
-      if(newScale<=1){offsetRef.current={x:0,y:0};}
-      setScale(newScale);
-      setOffset({...offsetRef.current});
-    } else if(touchStateRef.current.type==='drag' && e.touches.length===1){
-      e.preventDefault();
-      const newX=e.touches[0].clientX - touchStateRef.current.startX;
-      const newY=e.touches[0].clientY - touchStateRef.current.startY;
-      offsetRef.current={x:newX,y:newY};
-      setOffset({x:newX,y:newY});
-    }
-  };
-
-  const onTouchEnd=e=>{
-    // Agar zoom 1 ga qaytsa, offset reset
-    if(scaleRef.current<=1){resetZoom();}
-    // 1 barmoqqa o'tganda drag holatiga o'tish
-    if(e.touches.length===1 && touchStateRef.current?.type==='pinch'){
-      if(scaleRef.current>1){
-        touchStateRef.current={
-          type:'drag',
-          startX:e.touches[0].clientX - offsetRef.current.x,
-          startY:e.touches[0].clientY - offsetRef.current.y,
-        };
-      } else {
-        touchStateRef.current=null;
-      }
-    }
-    if(e.touches.length===0) touchStateRef.current=null;
-  };
-
-  const onTap=e=>{
-    // Zoom bo'lganda tap drag uchun, yo'qsa lightbox
-    if(scaleRef.current<=1){setOpen(true);resetLbZoom();}
-  };
-
-  // ── INLINE MOUSE ────────────────────────────────────────────
-  const onWheel=e=>{
-    e.preventDefault();
-    const newScale=Math.min(5,Math.max(1,scaleRef.current+(e.deltaY>0?-0.15:0.15)));
-    scaleRef.current=newScale;
-    if(newScale<=1){offsetRef.current={x:0,y:0};}
-    setScale(newScale); setOffset({...offsetRef.current});
-  };
-  const onMouseDown=e=>{
-    if(scaleRef.current<=1) return;
-    e.preventDefault();
-    mouseDragRef.current={startX:e.clientX-offsetRef.current.x,startY:e.clientY-offsetRef.current.y};
-    const onMove=ev=>{
-      if(!mouseDragRef.current) return;
-      const nx=ev.clientX-mouseDragRef.current.startX;
-      const ny=ev.clientY-mouseDragRef.current.startY;
-      offsetRef.current={x:nx,y:ny};
-      setOffset({x:nx,y:ny});
-    };
-    const onUp=()=>{mouseDragRef.current=null;window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
-    window.addEventListener("mousemove",onMove);
-    window.addEventListener("mouseup",onUp);
-  };
-  const onDblClick=()=>{scale>1?resetZoom():(()=>{scaleRef.current=2.5;setScale(2.5);})();};
-
-  // ── LIGHTBOX TOUCH ──────────────────────────────────────────
-  const onLbTouchStart=e=>{
-    e.stopPropagation();
-    if(e.touches.length===2){
-      const dx=e.touches[0].clientX-e.touches[1].clientX;
-      const dy=e.touches[0].clientY-e.touches[1].clientY;
-      lbTouchRef.current={
-        type:'pinch',
-        startDist:Math.hypot(dx,dy),
-        startScale:lbScaleRef.current,
-      };
-    } else if(e.touches.length===1){
-      if(lbScaleRef.current>1){
-        lbTouchRef.current={
-          type:'drag',
-          startX:e.touches[0].clientX - lbOffsetRef.current.x,
-          startY:e.touches[0].clientY - lbOffsetRef.current.y,
-        };
-      } else { lbTouchRef.current=null; }
-    }
-  };
-  const onLbTouchMove=e=>{
-    e.preventDefault(); e.stopPropagation();
-    if(!lbTouchRef.current) return;
-    if(lbTouchRef.current.type==='pinch' && e.touches.length===2){
-      const dx=e.touches[0].clientX-e.touches[1].clientX;
-      const dy=e.touches[0].clientY-e.touches[1].clientY;
-      const ratio=Math.hypot(dx,dy)/lbTouchRef.current.startDist;
-      const ns=Math.min(8,Math.max(1,lbTouchRef.current.startScale*ratio));
-      lbScaleRef.current=ns;
-      if(ns<=1) lbOffsetRef.current={x:0,y:0};
-      setLbScale(ns); setLbOffset({...lbOffsetRef.current});
-    } else if(lbTouchRef.current.type==='drag' && e.touches.length===1){
-      const nx=e.touches[0].clientX - lbTouchRef.current.startX;
-      const ny=e.touches[0].clientY - lbTouchRef.current.startY;
-      lbOffsetRef.current={x:nx,y:ny};
-      setLbOffset({x:nx,y:ny});
-    }
-  };
-  const onLbTouchEnd=e=>{
-    if(lbScaleRef.current<=1) resetLbZoom();
-    if(e.touches.length===1 && lbTouchRef.current?.type==='pinch'){
-      if(lbScaleRef.current>1){
-        lbTouchRef.current={type:'drag',startX:e.touches[0].clientX-lbOffsetRef.current.x,startY:e.touches[0].clientY-lbOffsetRef.current.y};
-      } else { lbTouchRef.current=null; }
-    }
-    if(e.touches.length===0) lbTouchRef.current=null;
-  };
-
-  // ── LIGHTBOX MOUSE ──────────────────────────────────────────
-  const onLbWheel=e=>{
-    e.preventDefault();
-    const ns=Math.min(8,Math.max(1,lbScaleRef.current+(e.deltaY>0?-0.2:0.2)));
-    lbScaleRef.current=ns;
-    if(ns<=1) lbOffsetRef.current={x:0,y:0};
-    setLbScale(ns); setLbOffset({...lbOffsetRef.current});
-  };
-  const onLbMouseDown=e=>{
-    if(lbScaleRef.current<=1){setOpen(false);return;}
-    e.preventDefault(); e.stopPropagation();
-    lbMouseRef.current={startX:e.clientX-lbOffsetRef.current.x,startY:e.clientY-lbOffsetRef.current.y};
-    const onMove=ev=>{
-      if(!lbMouseRef.current) return;
-      const nx=ev.clientX-lbMouseRef.current.startX;
-      const ny=ev.clientY-lbMouseRef.current.startY;
-      lbOffsetRef.current={x:nx,y:ny};
-      setLbOffset({x:nx,y:ny});
-    };
-    const onUp=()=>{lbMouseRef.current=null;window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
-    window.addEventListener("mousemove",onMove);
-    window.addEventListener("mouseup",onUp);
-  };
-  const onLbDblClick=e=>{e.stopPropagation();lbScaleRef.current>1?resetLbZoom():(()=>{lbScaleRef.current=2.5;setLbScale(2.5);})();};
-
-  const imgMinH=fillHeight?"0":"200px";
-  const imgMaxH=fillHeight?"100%":"55vh";
+  const imgMinH=fillHeight?"0":"180px";
+  const imgMaxH=fillHeight?"100%":"52vh";
 
   return (
     <>
-      <div className="gallery-wrap" style={{display:"flex",flexDirection:"column",height:fillHeight?"100%":"auto"}}>
+      <div style={{display:"flex",flexDirection:"column",height:fillHeight?"100%":"auto",background:"#070c18",borderRadius:fillHeight?"0":"12px",overflow:"hidden",border:fillHeight?"none":"1px solid var(--border)"}}>
+        {/* Image wrap */}
         <div
-          ref={imgWrapRef}
-          className="gallery-img-wrap"
-          style={{position:"relative",flex:fillHeight?1:"none",overflow:"hidden",minHeight:imgMinH,maxHeight:imgMaxH,userSelect:"none",touchAction:scale>1?"none":"pan-y"}}
-          onWheel={onWheel}
+          ref={wrapRef}
+          style={{
+            position:"relative",flex:fillHeight?1:"none",overflow:"hidden",
+            minHeight:imgMinH,maxHeight:imgMaxH,
+            cursor:scale>1?"grab":"zoom-in",userSelect:"none",
+            touchAction:scale>1?"none":"pan-y",
+          }}
           onMouseDown={onMouseDown}
           onDoubleClick={onDblClick}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onClick={scale<=1?onTap:undefined}
+          onClick={scale<=1?()=>{resetLB();setOpen(true);}:undefined}
         >
           <img
-            src={imgs[idx]} alt={`Rasm ${idx+1}`}
-            draggable={false}
+            src={imgs[idx]} alt={`Rasm ${idx+1}`} draggable={false}
             style={{
               width:"100%",objectFit:"contain",display:"block",
-              minHeight:imgMinH, maxHeight:imgMaxH,
+              minHeight:imgMinH,maxHeight:imgMaxH,
               transform:`scale(${scale}) translate(${offset.x/scale}px,${offset.y/scale}px)`,
               transition:scale===1?"transform .2s ease":"none",
-              cursor:scale>1?"grab":"zoom-in",
-              userSelect:"none",
+              userSelect:"none", pointerEvents:"none",
             }}
           />
-          {imgs.length>1&&(
-            <>
-              <button className="gnav" onClick={prev} style={{left:8,position:"absolute",top:"50%",transform:"translateY(-50%)",zIndex:10}}>&#8249;</button>
-              <button className="gnav" onClick={next} style={{right:8,position:"absolute",top:"50%",transform:"translateY(-50%)",zIndex:10}}>&#8250;</button>
-            </>
-          )}
-          {/* Zoom badge */}
-          {scale>1?(
-            <div style={{position:"absolute",top:8,right:8,background:"rgba(59,130,246,.85)",borderRadius:6,padding:"3px 9px",fontSize:11,color:"#fff",pointerEvents:"none",zIndex:10,fontWeight:700}}>{Math.round(scale*100)}%</div>
-          ):(
-            <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.6)",borderRadius:6,padding:"3px 10px",fontSize:10,color:"rgba(255,255,255,.8)",pointerEvents:"none",zIndex:10,whiteSpace:"nowrap"}}>
-              👆👆 Pinch = zoom · 👆 Drag = siljitish · Tap = to'liq
+          {imgs.length>1&&<>
+            <button className="gnav" onClick={e=>{e.stopPropagation();goTo((idx-1+imgs.length)%imgs.length);}} style={{left:8}}>&#8249;</button>
+            <button className="gnav" onClick={e=>{e.stopPropagation();goTo((idx+1)%imgs.length);}} style={{right:8}}>&#8250;</button>
+          </>}
+          {scale>1
+            ?<div style={{position:"absolute",top:8,right:8,background:"rgba(59,130,246,.85)",borderRadius:6,padding:"3px 9px",fontSize:11,color:"#fff",pointerEvents:"none",fontWeight:700}}>{Math.round(scale*100)}%</div>
+            :<div style={{position:"absolute",bottom:6,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.65)",borderRadius:6,padding:"2px 8px",fontSize:10,color:"rgba(255,255,255,.8)",pointerEvents:"none",whiteSpace:"nowrap"}}>
+              👆👆 Pinch·Drag = zoom · Tap = to'liq ekran
             </div>
-          )}
+          }
         </div>
+        {/* Dots */}
         {imgs.length>1&&(
-          <div style={{display:"flex",gap:6,justifyContent:"center",padding:"7px 0",background:"rgba(0,0,0,.35)",flexShrink:0}}>
+          <div style={{display:"flex",gap:6,justifyContent:"center",padding:"7px 0",background:"rgba(0,0,0,.4)",flexShrink:0}}>
             {imgs.map((_,i)=>(
-              <button key={i} onClick={()=>{setIdx(i);resetZoom();}} style={{width:i===idx?18:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i===idx?"var(--blue)":"rgba(255,255,255,.3)",transition:"all .2s"}}/>
+              <button key={i} onClick={()=>goTo(i)} style={{width:i===idx?18:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i===idx?"var(--blue)":"rgba(255,255,255,.3)",transition:"all .2s"}}/>
             ))}
           </div>
         )}
@@ -431,29 +402,11 @@ const Gallery = ({images=[],fillHeight=false}) => {
       {/* LIGHTBOX */}
       {open&&(
         <div
-          className="lightbox"
-          onWheel={onLbWheel}
-          onTouchStart={onLbTouchStart}
-          onTouchMove={onLbTouchMove}
-          onTouchEnd={onLbTouchEnd}
-          onClick={lbScaleRef.current<=1?()=>{setOpen(false);resetLbZoom();}:undefined}
-          style={{touchAction:"none"}}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,.97)",zIndex:999999,display:"flex",alignItems:"center",justifyContent:"center",isolation:"isolate",touchAction:"none"}}
+          onClick={LB.current.scale<=1?()=>{setOpen(false);resetLB();}:undefined}
         >
-          <button onClick={()=>{setOpen(false);resetLbZoom();}} style={{position:"absolute",top:14,right:14,width:44,height:44,borderRadius:"50%",background:"var(--red)",border:"none",color:"#fff",fontSize:22,cursor:"pointer",zIndex:1000000,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-          {lbScale>1&&<button onClick={e=>{e.stopPropagation();resetLbZoom();}} style={{position:"absolute",top:14,left:14,padding:"6px 14px",borderRadius:8,background:"rgba(59,130,246,.85)",border:"none",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",zIndex:1000000}}>{Math.round(lbScale*100)}% — Reset</button>}
-          {lbScale===1&&<div style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.7)",borderRadius:8,padding:"5px 14px",fontSize:11,color:"rgba(255,255,255,.75)",pointerEvents:"none",zIndex:1000000,whiteSpace:"nowrap"}}>👆👆 Pinch · 👆 Drag · 2×tap = zoom</div>}
-          {imgs.length>1&&(
-            <>
-              <button className="gnav" onClick={prevLb} style={{left:12,position:"absolute",width:50,height:50,zIndex:1000000}}>&#8249;</button>
-              <button className="gnav" onClick={nextLb} style={{right:12,position:"absolute",width:50,height:50,zIndex:1000000}}>&#8250;</button>
-            </>
-          )}
-          <div
-            className="lightbox-img-wrap"
-            onMouseDown={onLbMouseDown}
-            onDoubleClick={onLbDblClick}
-            style={{cursor:lbScale>1?"grab":"zoom-in",touchAction:"none"}}
-          >
+          <div ref={lbWrapRef} style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:lbScale>1?"grab":"zoom-in"}}
+            onMouseDown={onLbMouseDown} onDoubleClick={onLbDblClick}>
             <img
               src={imgs[idx]} alt="katta" draggable={false}
               style={{
@@ -464,11 +417,17 @@ const Gallery = ({images=[],fillHeight=false}) => {
               }}
             />
           </div>
-          {imgs.length>1&&(
-            <div style={{position:"absolute",bottom:52,left:0,right:0,display:"flex",justifyContent:"center",gap:6,zIndex:1000000}}>
-              {imgs.map((_,i)=><button key={i} onClick={e=>{e.stopPropagation();setIdx(i);resetLbZoom();}} style={{width:i===idx?18:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i===idx?"var(--blue)":"rgba(255,255,255,.4)",transition:"all .2s"}}/>)}
+          {/* Controls */}
+          <button onClick={()=>{setOpen(false);resetLB();}} style={{position:"absolute",top:14,right:14,width:44,height:44,borderRadius:"50%",background:"var(--red)",border:"none",color:"#fff",fontSize:22,cursor:"pointer",zIndex:10,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          {lbScale>1&&<button onClick={e=>{e.stopPropagation();resetLB();}} style={{position:"absolute",top:14,left:14,padding:"6px 14px",borderRadius:8,background:"rgba(59,130,246,.85)",border:"none",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",zIndex:10}}>{Math.round(lbScale*100)}% — Reset</button>}
+          {lbScale===1&&<div style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.7)",borderRadius:8,padding:"4px 14px",fontSize:11,color:"rgba(255,255,255,.7)",pointerEvents:"none",zIndex:10,whiteSpace:"nowrap"}}>👆👆 Pinch · 👆 Drag · 2×tap = zoom</div>}
+          {imgs.length>1&&<>
+            <button className="gnav" onClick={e=>{e.stopPropagation();goToLb((idx-1+imgs.length)%imgs.length);}} style={{left:12,position:"absolute",width:50,height:50,zIndex:10}}>&#8249;</button>
+            <button className="gnav" onClick={e=>{e.stopPropagation();goToLb((idx+1)%imgs.length);}} style={{right:12,position:"absolute",width:50,height:50,zIndex:10}}>&#8250;</button>
+            <div style={{position:"absolute",bottom:50,left:0,right:0,display:"flex",justifyContent:"center",gap:6,zIndex:10}}>
+              {imgs.map((_,i)=><button key={i} onClick={e=>{e.stopPropagation();goToLb(i);}} style={{width:i===idx?18:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i===idx?"var(--blue)":"rgba(255,255,255,.4)",transition:"all .2s"}}/>)}
             </div>
-          )}
+          </>}
         </div>
       )}
     </>
