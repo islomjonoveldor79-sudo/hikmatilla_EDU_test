@@ -1349,7 +1349,8 @@ const AdminPanel = ({profile,onLogout}) => {
   };
 
   const deleteTeacher=async(id)=>{
-    await sb.from("profiles").delete().eq("id",id);
+    const {error}=await sb.rpc('delete_user',{user_id:id});
+    if(error){alert("Xato: "+error.message);return;}
     setDeleteConfirm(null);
     await loadData();
   };
