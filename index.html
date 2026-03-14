@@ -1136,13 +1136,17 @@ const TestPage = ({profile,test,attemptNumber,onFinish}) => {
   useEffect(()=>{const c=()=>setIsMobile(window.innerWidth<768);window.addEventListener("resize",c);return()=>window.removeEventListener("resize",c);},[]);
   const pick=(q,l)=>{const n={...answersRef.current,[q]:l};answersRef.current=n;setAnswers({...n});};
 
-  const doFinish=useCallback(()=>{
-    if(finishedRef.current) return;finishedRef.current=true;
-    const timeTaken=Math.floor((Date.now()-startRef.current)/1000);
-    const ans=answersRef.current;let score=0;
-    for(let i=1;i<=test.question_count;i++)if(ans[i]&&test.answer_key[i]&&ans[i]===test.answer_key[i])score++;
-    onFinish({answers:{...ans},score,timeTaken,attemptNumber});
-  },[test,onFinish,attemptNumber]);
+  const doFinish=useCallback(async()=>{
+      if(finishedRef.current) return;
+      finishedRef.current=true;
+      const timeTaken=Math.floor((Date.now()-startRef.current)/1000);
+      const ans=answersRef.current;
+      try{
+        await onFinish({answers:{...ans},timeTaken,attemptNumber});
+      }catch(e){
+        finishedRef.current=false;
+      }
+    },[onFinish,attemptNumber]);
 
   useEffect(()=>{
     const t=setInterval(()=>setTimeLeft(p=>{if(p<=1){clearInterval(t);setTimeout(doFinish,100);return 0;}return p-1;}),1000);
@@ -1565,7 +1569,10 @@ function App() {
       p_time_taken: timeTaken,
       p_attempt_number: attemptNumber
     });
-    if(error){alert("Xato: " + error.message); return;}
+    if(error){
+      alert("Xato: " + error.message + "\nQayta urinib ko'ring!");
+      return;
+    }
     setLastResult({
       answers,
       score: data.score,
