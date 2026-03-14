@@ -1427,7 +1427,7 @@ Bu amalni ortga qaytarib bo'lmaydi!`} onConfirm={()=>deleteTeacher(deleteConfirm
               <Card>
                 <div style={{overflowX:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",minWidth:280}}>
-                    <thead><tr style={{borderBottom:"1px solid var(--border)"}}>{["#","To'liq ism","Email","Qo'shilgan"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--text3)",fontSize:12,fontWeight:600,textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                    <thead><tr style={{borderBottom:"1px solid var(--border)"}}>{["#","To'liq ism","Email","Qo'shilgan","Amal"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--text3)",fontSize:12,fontWeight:600,textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
                     <tbody>
                       {students.map((u,i)=>(
                         <tr key={u.id} style={{borderBottom:"1px solid rgba(255,255,255,.04)"}}>
@@ -1435,6 +1435,9 @@ Bu amalni ortga qaytarib bo'lmaydi!`} onConfirm={()=>deleteTeacher(deleteConfirm
                           <td style={{padding:"10px 10px",color:"var(--text)",fontWeight:600,fontSize:14}}>{u.full_name}</td>
                           <td style={{padding:"10px 10px",color:"var(--blue)",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{u.email||"—"}</td>
                           <td style={{padding:"10px 10px",color:"var(--text3)",fontSize:12}}>{new Date(u.created_at).toLocaleDateString("uz-UZ")}</td>
+                          <td style={{padding:"10px 10px"}}>
+                            <button onClick={()=>setDeleteConfirm({id:u.id,name:u.full_name})} style={{padding:"6px 12px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>🗑 O'chirish</button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
