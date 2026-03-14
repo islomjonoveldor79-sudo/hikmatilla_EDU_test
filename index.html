@@ -1025,7 +1025,7 @@ const StudentEntry = ({profile,onStart,onLogout}) => {
     const c=code.trim().toUpperCase();
     if(!c) return setErr("Kodni kiriting!");
     setErr("");setChecking(true);
-    const {data:tests}=await sb.from("tests").select("*").eq("access_code",c).eq("active",true);
+    const {data:tests}=await sb.from("tests").select("id,title,teacher_id,time_limit,question_count,image_urls,active,access_code").eq("access_code",c).eq("active",true);
     setChecking(false);
     if(!tests||!tests.length) return setErr("Kod noto'g'ri yoki test faol emas!");
     const test=tests[0];
