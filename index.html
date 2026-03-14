@@ -757,7 +757,7 @@ const TeacherPanel = ({profile,onLogout}) => {
     setLoading(true);
     const {data:t}=await sb.from("tests").select("*").eq("teacher_id",profile.id).order("created_at",{ascending:false});
     const ids=(t||[]).map(x=>x.id);
-    const {data:r}=ids.length?await sb.from("results").select("*,profiles(full_name)").in("test_id",ids):{data:[]};
+    const {data:r}=ids.length?await sb.from("results").select("*,profiles!fk_results_student(full_name)").in("test_id",ids):{data:[]};
     setTests(t||[]);setResults(r||[]);setLoading(false);
   },[profile.id]);
 
