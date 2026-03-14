@@ -1354,7 +1354,7 @@ const AdminPanel = ({profile,onLogout}) => {
 
   return (
     <div style={{minHeight:"100vh",background:"var(--bg)",paddingBottom:72}}>
-      {deleteConfirm&&<ConfirmModal message={`"${deleteConfirm.name}" o'qituvchisini o'chirasizmi?
+      {deleteConfirm&&<ConfirmModal message={`"${deleteConfirm.name}" ni o'chirasizmi?
 Bu amalni ortga qaytarib bo'lmaydi!`} onConfirm={()=>deleteTeacher(deleteConfirm.id)} onCancel={()=>setDeleteConfirm(null)} danger={true}/>}
       <div style={{background:"rgba(255,255,255,.02)",borderBottom:"1px solid var(--border)",padding:"0 16px",height:52,position:"sticky",top:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:20}}>🎓</span><span style={{fontWeight:800,fontSize:16,color:"var(--text)"}}>Testlyy</span><Badge color="var(--purple)">Admin</Badge></div>
