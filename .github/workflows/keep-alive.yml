@@ -1,0 +1,16 @@
+name: Keep Alive
+
+on:
+  schedule:
+    - cron: '0 12 * * *'   # Har kuni soat 12:00 da ishlaydi
+  workflow_dispatch:        # Qo'lda ham ishlatish mumkin
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Keep alive ping
+        run: echo "Salom! Men hali tirikman - $(date)"
