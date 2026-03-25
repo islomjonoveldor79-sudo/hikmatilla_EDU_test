@@ -2,15 +2,14 @@ name: Keep Alive
 
 on:
   schedule:
-    - cron: '0 12 * * *'   # Har kuni soat 12:00 da ishlaydi
-  workflow_dispatch:        # Qo'lda ham ishlatish mumkin
+    - cron: '0 12 * * *'
+  workflow_dispatch:
 
 jobs:
   keep-alive:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Keep alive ping
-        run: echo "Salom! Men hali tirikman - $(date)"
+      - name: Ping Supabase
+        run: |
+          curl https://lyjhbzyykubeuvenmbjc.supabase.co/rest/v1/ \
+          -H "apikey: sb_publishable_0Bj0zi07uA0KE4zZ7HO_pg_LlATbEAN"
